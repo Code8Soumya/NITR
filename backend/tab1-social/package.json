@@ -1,0 +1,18 @@
+{
+  "name": "@nitr/tab1-social-backend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "check": "node --check src/handler.js",
+    "migrate": "node --env-file=.env scripts/runMigration.js"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.771.0",
+    "@aws-sdk/s3-request-presigner": "^3.771.0",
+    "pg": "^8.13.3"
+  }
+}

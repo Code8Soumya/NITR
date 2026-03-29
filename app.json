@@ -1,0 +1,25 @@
+{
+  "expo": {
+    "name": "NITR HUB",
+    "slug": "nitr-hub",
+    "scheme": "nitrhub",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "plugins": [
+      "expo-router"
+    ],
+    "android": {
+      "package": "com.nitrhub.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#ffffff"
+      },
+      "permissions": [
+        "INTERNET"
+      ]
+    },
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
