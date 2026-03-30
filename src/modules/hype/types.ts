@@ -35,7 +35,7 @@ export type FeedQuery = {
 
 export type CreatePostPayload = {
   caption: string;
-  media?: {
+  media: {
     uri: string;
     mediaType: HypeMediaType;
   }[];

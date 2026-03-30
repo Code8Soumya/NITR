@@ -32,3 +32,5 @@ ios/
 
 expo-env.d.ts
 # @end expo-cli
+
+lambda_push_code.txt

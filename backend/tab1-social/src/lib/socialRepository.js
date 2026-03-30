@@ -3,6 +3,7 @@ import { Buffer } from "node:buffer";
 import { withTransaction } from "./db.js";
 import { HttpError } from "./errors.js";
 import { extractHashtags, normalizeHashtag } from "./hashtags.js";
+import { logWarn } from "./logger.js";
 
 const maxCaptionLength = 2000;
 const maxCommentLength = 1000;
@@ -35,7 +36,18 @@ const decodeCursor = (cursor) => {
       createdAt: decoded.createdAt,
       id: decoded.id
     };
-  } catch {
+  } catch (error) {
+    logWarn(
+      "Feed cursor decode failed",
+      {
+        file: "backend/tab1-social/src/lib/socialRepository.js",
+        location: "decodeCursor",
+        action: "decode feed pagination cursor",
+        cursor
+      },
+      error
+    );
+
     throw new HttpError(400, "cursor is invalid", "INVALID_CURSOR");
   }
 };
@@ -273,6 +285,10 @@ export const createPost = async ({ user, caption, media }) => {
 
   if (sanitizedCaption.length > maxCaptionLength) {
     throw new HttpError(400, "caption exceeds 2000 characters", "INVALID_CAPTION");
+  }
+
+  if (!Array.isArray(media) || media.length === 0) {
+    throw new HttpError(400, "At least one media item is required", "INVALID_MEDIA");
   }
 
   return withTransaction(async (client) => {

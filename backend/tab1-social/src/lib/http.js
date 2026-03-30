@@ -1,15 +1,17 @@
 import { Buffer } from "node:buffer";
 
 import { HttpError, isHttpError } from "./errors.js";
+import { logError, logWarn } from "./logger.js";
 
 const corsOrigin = process.env.CORS_ALLOW_ORIGIN ?? "*";
+const exposeInternalErrors = (process.env.EXPOSE_INTERNAL_ERRORS ?? "false").toLowerCase() === "true";
 
 const buildHeaders = () => ({
   "Content-Type": "application/json",
   "Access-Control-Allow-Origin": corsOrigin,
   "Access-Control-Allow-Headers":
-    "Content-Type,Authorization,X-Dev-User-Id,X-Dev-User-Name,X-Dev-User-Branch",
-  "Access-Control-Allow-Methods": "GET,POST,OPTIONS"
+    "Content-Type,Authorization,X-Dev-User-Id,X-Dev-User-Name,X-Dev-User-Branch,X-Dev-User-Email",
+  "Access-Control-Allow-Methods": "GET,POST,PUT,OPTIONS"
 });
 
 export const jsonResponse = (statusCode, payload) => ({
@@ -73,22 +75,54 @@ export const normalizePath = (rawPath) => {
   return path.length ? path : "/";
 };
 
-export const errorResponse = (error) => {
+export const errorResponse = (error, context = {}) => {
+  const requestId = typeof context?.requestId === "string" ? context.requestId : undefined;
+
   if (isHttpError(error)) {
+    const statusCode = error.statusCode ?? 400;
+    const errorCode = error.code ?? "BAD_REQUEST";
+
+    const logContext = {
+      ...context,
+      file: "backend/tab1-social/src/lib/http.js",
+      location: "errorResponse",
+      statusCode,
+      errorCode
+    };
+
+    if (statusCode >= 500) {
+      logError("Server-side HttpError response", error, logContext);
+    } else {
+      logWarn("Client-facing HttpError response", logContext, error);
+    }
+
+    const payload = {
+      code: error.code ?? "BAD_REQUEST",
+      message: error.message,
+      ...(requestId ? { requestId } : {})
+    };
+
     return jsonResponse(error.statusCode ?? 400, {
-      error: {
-        code: error.code ?? "BAD_REQUEST",
-        message: error.message
-      }
+      error: payload
     });
   }
 
-  console.error("Unhandled backend error", error);
+  logError("Unhandled backend error", error, {
+    ...context,
+    file: "backend/tab1-social/src/lib/http.js",
+    location: "errorResponse"
+  });
+
+  const debugMessage =
+    exposeInternalErrors && error instanceof Error && error.message
+      ? error.message
+      : "Something went wrong";
 
   return jsonResponse(500, {
     error: {
       code: "INTERNAL_SERVER_ERROR",
-      message: "Something went wrong"
+      message: debugMessage,
+      ...(requestId ? { requestId } : {})
     }
   });
 };

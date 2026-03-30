@@ -13,6 +13,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useHypeActions } from "@/modules/hype/hooks/useHypeActions";
 import { type HypeMediaType } from "@/modules/hype/types";
+import { appLogger } from "@/shared/utils/logger";
 
 export function CreatePostScreen() {
   const router = useRouter();
@@ -20,7 +21,6 @@ export function CreatePostScreen() {
 
   const [caption, setCaption] = useState("");
   const [mediaUri, setMediaUri] = useState("");
-  const [mediaType, setMediaType] = useState<HypeMediaType>("image");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
 
@@ -30,24 +30,43 @@ export function CreatePostScreen() {
       return;
     }
 
+    if (!mediaUri.trim()) {
+      setError("A photo or video URL is required");
+      return;
+    }
+
+    const inferredMediaType: HypeMediaType = mediaUri.trim().match(/\.(mp4|mov|wmv|flv|avi|mkv|webm)$/i) ? "video" : "image";
+
     setError(undefined);
     setIsSubmitting(true);
 
     try {
       await createPost({
         caption,
-        media: mediaUri.trim()
-          ? [
-              {
-                uri: mediaUri.trim(),
-                mediaType
-              }
-            ]
-          : undefined
+        media: [
+          {
+            uri: mediaUri.trim(),
+            mediaType: inferredMediaType
+          }
+        ]
       });
 
       router.replace("/(tabs)/hype");
-    } catch {
+    } catch (publishError) {
+      appLogger.error(
+        "Failed to publish hype post",
+        {
+          file: "src/modules/hype/screens/CreatePostScreen.tsx",
+          location: "CreatePostScreen.publishPost",
+          action: "publish post",
+          details: {
+            captionLength: caption.length,
+            mediaUri
+          }
+        },
+        publishError
+      );
+
       setError("Unable to publish post right now");
     } finally {
       setIsSubmitting(false);
@@ -63,7 +82,7 @@ export function CreatePostScreen() {
         <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 32 }}>
           <Text className="text-3xl font-extrabold text-slate-900">Create Hype Post</Text>
           <Text className="mt-1 text-sm text-slate-500">
-            Add text plus optional photo/video URL. Hashtags are auto-parsed from caption.
+            Add text and a mandatory photo or video URL. Hashtags are auto-parsed from caption.
           </Text>
 
           <View className="mt-6 rounded-2xl bg-white p-4" style={{ elevation: 2 }}>
@@ -77,7 +96,7 @@ export function CreatePostScreen() {
               onChangeText={setCaption}
             />
 
-            <Text className="mt-4 text-sm font-semibold text-slate-700">Media URL (optional)</Text>
+            <Text className="mt-4 text-sm font-semibold text-slate-700">Media URL (required)</Text>
             <TextInput
               className="mt-2 rounded-xl border border-slate-300 px-4 py-3 text-base text-slate-900"
               placeholder="https://..."
@@ -86,32 +105,6 @@ export function CreatePostScreen() {
               value={mediaUri}
               onChangeText={setMediaUri}
             />
-
-            <Text className="mt-4 text-sm font-semibold text-slate-700">Media Type</Text>
-            <View className="mt-2 flex-row gap-2">
-              <Pressable
-                className={`flex-1 rounded-xl px-3 py-3 ${
-                  mediaType === "image" ? "bg-rose-600" : "bg-slate-100"
-                }`}
-                android_ripple={{ color: "#fecdd3" }}
-                onPress={() => setMediaType("image")}
-              >
-                <Text className={mediaType === "image" ? "text-center font-semibold text-white" : "text-center font-semibold text-slate-700"}>
-                  Image
-                </Text>
-              </Pressable>
-              <Pressable
-                className={`flex-1 rounded-xl px-3 py-3 ${
-                  mediaType === "video" ? "bg-rose-600" : "bg-slate-100"
-                }`}
-                android_ripple={{ color: "#fecdd3" }}
-                onPress={() => setMediaType("video")}
-              >
-                <Text className={mediaType === "video" ? "text-center font-semibold text-white" : "text-center font-semibold text-slate-700"}>
-                  Video
-                </Text>
-              </Pressable>
-            </View>
 
             {error ? <Text className="mt-4 text-sm text-rose-700">{error}</Text> : null}
 

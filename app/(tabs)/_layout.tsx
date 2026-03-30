@@ -1,11 +1,31 @@
-import { Tabs } from "expo-router";
-import { Text } from "react-native";
+import { Redirect, Tabs } from "expo-router";
+import { ActivityIndicator, Text, View } from "react-native";
+
+import { useAuth } from "@/modules/auth/hooks/useAuth";
 
 function TabIcon({ icon, color }: { icon: string; color: string }) {
   return <Text style={{ color, fontSize: 16 }}>{icon}</Text>;
 }
 
 export default function TabsLayout() {
+  const { bootstrapped, user } = useAuth();
+
+  if (!bootstrapped) {
+    return (
+      <View className="flex-1 items-center justify-center bg-amber-50">
+        <ActivityIndicator size="large" color="#be123c" />
+      </View>
+    );
+  }
+
+  if (!user) {
+    return <Redirect href={"/(auth)/login" as never} />;
+  }
+
+  if (!user.isAdmin && user.approvalStatus !== "approved") {
+    return <Redirect href={"/(auth)/pending" as never} />;
+  }
+
   return (
     <Tabs
       screenOptions={{
@@ -42,6 +62,7 @@ export default function TabsLayout() {
       />
       <Tabs.Screen name="hype/create" options={{ href: null, title: "Create Post" }} />
       <Tabs.Screen name="hype/[postId]" options={{ href: null, title: "Post" }} />
+      <Tabs.Screen name="hype/profile" options={{ href: null, title: "Profile" }} />
     </Tabs>
   );
 }

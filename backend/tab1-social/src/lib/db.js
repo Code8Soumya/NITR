@@ -1,6 +1,7 @@
 import { Pool } from "pg";
 
-import { HttpError } from "./errors.js";
+import { HttpError, isHttpError } from "./errors.js";
+import { logError } from "./logger.js";
 
 let pool;
 
@@ -11,12 +12,17 @@ const buildPool = () => {
   }
 
   const sslEnabled = (process.env.PG_SSL ?? "true").toLowerCase() === "true";
+  const parsedConnectTimeoutMs = Number.parseInt(process.env.PG_CONNECT_TIMEOUT_MS ?? "15000", 10);
+  const connectTimeoutMs =
+    Number.isFinite(parsedConnectTimeoutMs) && parsedConnectTimeoutMs > 0
+      ? parsedConnectTimeoutMs
+      : 15000;
 
   return new Pool({
     connectionString,
     max: 8,
     idleTimeoutMillis: 30_000,
-    connectionTimeoutMillis: 5_000,
+    connectionTimeoutMillis: connectTimeoutMs,
     ssl: sslEnabled ? { rejectUnauthorized: false } : undefined
   });
 };
@@ -38,7 +44,25 @@ export const withTransaction = async (callback) => {
     await client.query("COMMIT");
     return result;
   } catch (error) {
-    await client.query("ROLLBACK");
+    try {
+      await client.query("ROLLBACK");
+    } catch (rollbackError) {
+      logError("Database rollback failed", rollbackError, {
+        file: "backend/tab1-social/src/lib/db.js",
+        location: "withTransaction",
+        action: "rollback transaction after failure"
+      });
+    }
+
+    const shouldLog = !isHttpError(error) || (error.statusCode ?? 500) >= 500;
+    if (shouldLog) {
+      logError("Database transaction failed", error, {
+        file: "backend/tab1-social/src/lib/db.js",
+        location: "withTransaction",
+        action: "run transactional callback"
+      });
+    }
+
     throw error;
   } finally {
     client.release();

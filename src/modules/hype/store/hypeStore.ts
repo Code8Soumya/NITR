@@ -6,6 +6,7 @@ import {
   type CreatePostPayload,
   type HypePost
 } from "@/modules/hype/types";
+import { appLogger } from "@/shared/utils/logger";
 
 type HypeState = {
   posts: HypePost[];
@@ -40,6 +41,16 @@ export const useHypeStore = create<HypeState>((set, get) => ({
       const posts = await hypeApi.getFeed();
       set({ posts: sortByCreatedAt(posts), isLoading: false, hasLoaded: true });
     } catch (error) {
+      appLogger.error(
+        "Failed to load hype feed",
+        {
+          file: "src/modules/hype/store/hypeStore.ts",
+          location: "useHypeStore.loadFeed",
+          action: "fetch initial feed"
+        },
+        error
+      );
+
       set({
         isLoading: false,
         error: error instanceof Error ? error.message : "Failed to load Hype feed"
@@ -54,6 +65,16 @@ export const useHypeStore = create<HypeState>((set, get) => ({
       const posts = await hypeApi.getFeed();
       set({ posts: sortByCreatedAt(posts), isRefreshing: false, hasLoaded: true });
     } catch (error) {
+      appLogger.error(
+        "Failed to refresh hype feed",
+        {
+          file: "src/modules/hype/store/hypeStore.ts",
+          location: "useHypeStore.refreshFeed",
+          action: "refresh feed"
+        },
+        error
+      );
+
       set({
         isRefreshing: false,
         error: error instanceof Error ? error.message : "Failed to refresh feed"
@@ -70,6 +91,20 @@ export const useHypeStore = create<HypeState>((set, get) => ({
       const created = await hypeApi.createPost(payload);
       set({ posts: sortByCreatedAt([created, ...posts]) });
     } catch (error) {
+      appLogger.error(
+        "Failed to create hype post",
+        {
+          file: "src/modules/hype/store/hypeStore.ts",
+          location: "useHypeStore.createPost",
+          action: "submit post",
+          details: {
+            mediaCount: payload.media.length,
+            captionLength: payload.caption.length
+          }
+        },
+        error
+      );
+
       set({ error: error instanceof Error ? error.message : "Could not publish post" });
       throw error;
     }
@@ -110,7 +145,20 @@ export const useHypeStore = create<HypeState>((set, get) => ({
           })
         )
       }));
-    } catch {
+    } catch (error) {
+      appLogger.error(
+        "Failed to toggle hype",
+        {
+          file: "src/modules/hype/store/hypeStore.ts",
+          location: "useHypeStore.toggleHype",
+          action: "toggle hype",
+          details: {
+            postId
+          }
+        },
+        error
+      );
+
       set({ posts: current, error: "Hype update failed" });
     }
   },
@@ -136,7 +184,20 @@ export const useHypeStore = create<HypeState>((set, get) => ({
           })
         )
       }));
-    } catch {
+    } catch (error) {
+      appLogger.error(
+        "Failed to add comment",
+        {
+          file: "src/modules/hype/store/hypeStore.ts",
+          location: "useHypeStore.addComment",
+          action: "create comment",
+          details: {
+            postId: payload.postId
+          }
+        },
+        error
+      );
+
       set({ error: "Failed to add comment" });
     }
   }

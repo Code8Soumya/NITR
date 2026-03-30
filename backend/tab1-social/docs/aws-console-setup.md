@@ -61,8 +61,14 @@ Create these security groups:
    - Public access: disabled
    - Attach security group: `nitr-social-aurora-sg`
 3. Create database `nitr` (or your preferred name).
-4. Run migration `backend/tab1-social/sql/001_tab1_social.sql`.
-   - Use Query Editor v2 or a migration runner that has VPC access.
+4. Run all migrations in order:
+  - `backend/tab1-social/sql/001_tab1_social.sql`
+  - `backend/tab1-social/sql/002_auth_and_admin.sql`
+  - `backend/tab1-social/sql/003_auth_cognito_otp.sql`
+  - `backend/tab1-social/sql/004_auth_profile_fields.sql`
+
+  Use Query Editor v2 or a migration runner that has VPC access.
+
 5. Connection string format:
 
 ```text
@@ -83,13 +89,25 @@ Lambda env keys for this backend:
 
 - `DATABASE_URL`
 - `PG_SSL=true`
+- `PG_CONNECT_TIMEOUT_MS=15000`
 - `AWS_REGION=ap-south-1`
 - `SOCIAL_MEDIA_BUCKET=<bucket-name>`
 - `SOCIAL_MEDIA_PUBLIC_BASE_URL=<cloudfront-url>`
 - `CORS_ALLOW_ORIGIN=<exact-origin-or-list>`
+- `EXPOSE_INTERNAL_ERRORS=false` (set `true` only for short debugging windows)
 - `DEFAULT_FEED_LIMIT=20`
 - `MAX_FEED_LIMIT=50`
 - `ENABLE_DEV_HEADERS=false` (production)
+- `ADMIN_EMAIL=122ME0914@nitrkl.ac.in`
+- `ACCESS_TOKEN_SECRET=<long-random-secret>`
+- `REFRESH_TOKEN_SECRET=<long-random-secret>`
+- `ACCESS_TOKEN_TTL=15m`
+- `REFRESH_TOKEN_TTL=30d`
+- `BCRYPT_ROUNDS=12`
+- `COGNITO_OTP_ENABLED=true`
+- `COGNITO_REGION=ap-south-1`
+- `COGNITO_USER_POOL_CLIENT_ID=<cognito-app-client-id>`
+- `COGNITO_USER_POOL_CLIENT_SECRET=<optional-if-secret-enabled>`
 
 ## 5. S3 + CloudFront for Media
 
@@ -130,6 +148,16 @@ Custom inline policy (example baseline):
         "secretsmanager:GetSecretValue"
       ],
       "Resource": "arn:aws:secretsmanager:ap-south-1:<account-id>:secret:nitr/*"
+    },
+    {
+      "Sid": "CognitoOtpCalls",
+      "Effect": "Allow",
+      "Action": [
+        "cognito-idp:SignUp",
+        "cognito-idp:ConfirmSignUp",
+        "cognito-idp:ResendConfirmationCode"
+      ],
+      "Resource": "*"
     }
   ]
 }
@@ -176,22 +204,45 @@ Routes:
 6. `POST /api/v1/social/posts/{postId}/comments`
 7. `GET /api/v1/social/hashtags/trending`
 8. `POST /api/v1/social/media/upload-url`
+9. `POST /api/v1/auth/register`
+10. `POST /api/v1/auth/verify-otp`
+11. `POST /api/v1/auth/resend-otp`
+12. `POST /api/v1/auth/login`
+13. `PUT /api/v1/auth/profile`
+14. `POST /api/v1/auth/refresh`
+15. `POST /api/v1/auth/logout`
+16. `GET /api/v1/auth/me`
+17. `GET /api/v1/admin/approvals/pending`
+18. `POST /api/v1/admin/approvals/{userId}/approve`
+19. `POST /api/v1/admin/approvals/{userId}/reject`
 
 CORS:
 
 1. Allow only your known client origins.
-2. Allow headers: `Content-Type,Authorization,X-Dev-User-Id,X-Dev-User-Name,X-Dev-User-Branch`.
-3. Allow methods: `GET,POST,OPTIONS`.
+2. Allow headers: `Content-Type,Authorization,X-Dev-User-Id,X-Dev-User-Name,X-Dev-User-Branch,X-Dev-User-Email`.
+3. Allow methods: `GET,POST,PUT,OPTIONS`.
 
-## 9. Cognito Authorizer (Production)
+## 9. Cognito OTP Setup
 
-1. Create JWT authorizer in API Gateway (Cognito User Pool).
-2. Attach to all social routes except health (optional exception).
-3. Ensure tokens include/mapped claims:
-   - `sub`
-   - `name` or `custom:display_name`
-   - `custom:branch`
-4. Keep `ENABLE_DEV_HEADERS=false` in production.
+1. Create a Cognito User Pool.
+2. Configure email-based sign-in and email verification.
+3. Enable self-registration.
+4. Set required signup attributes:
+  - `email`
+  - `name`
+  - `nickname`
+  - `birthdate`
+  - `gender`
+5. Keep sign-in option as Email.
+6. Create an App Client for mobile auth flows.
+7. Use `ALLOW_USER_PASSWORD_AUTH` in app client auth flows.
+8. Set Lambda env vars:
+  - `COGNITO_OTP_ENABLED=true`
+  - `COGNITO_REGION`
+  - `COGNITO_USER_POOL_CLIENT_ID`
+  - `COGNITO_USER_POOL_CLIENT_SECRET` (only if the app client uses a secret)
+9. Keep `ENABLE_DEV_HEADERS=false` in production.
+10. API Gateway Cognito JWT authorizer is optional for this implementation because API auth still relies on app-issued JWT tokens.
 
 ## 10. Frontend Env Setup
 

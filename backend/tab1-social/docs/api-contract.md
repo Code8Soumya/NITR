@@ -81,6 +81,7 @@ Failure:
   ]
 }
 ```
+*Note: `media` array is mandatory and must contain at least one item.*
 
 4. `POST /api/v1/social/posts/{postId}/hypes`
 - Body: none
@@ -138,3 +139,202 @@ Failure:
   }
 }
 ```
+
+## Auth Endpoints
+
+8. `POST /api/v1/auth/register`
+- Body:
+
+```json
+{
+  "email": "122ME0914@nitrkl.ac.in",
+  "password": "Str0ngPass123",
+  "name": "Admin Name",
+  "nickname": "nitr_admin",
+  "birthDate": "2004-01-10",
+  "gender": "male",
+  "branch": "ME",
+  "bio": "Mechanical student.",
+  "interests": ["CAD", "Cricket"]
+}
+```
+
+- Returns when `COGNITO_OTP_ENABLED=true`:
+
+```json
+{
+  "data": {
+    "otpRequired": true,
+    "email": "122me0914@nitrkl.ac.in",
+    "delivery": {
+      "destination": "1***@nitrkl.ac.in",
+      "medium": "EMAIL",
+      "attributeName": "email"
+    },
+    "message": "OTP sent. Verify your email before login."
+  }
+}
+```
+
+- Returns when `COGNITO_OTP_ENABLED=false`:
+
+```json
+{
+  "data": {
+    "user": {
+      "id": "uuid",
+      "email": "122me0914@nitrkl.ac.in",
+      "name": "Admin Name",
+      "nickname": "nitr_admin",
+      "branch": "ME",
+      "birthDate": "2004-01-10",
+      "gender": "male",
+      "bio": "Mechanical student.",
+      "interests": ["CAD", "Cricket"],
+      "approvalStatus": "approved",
+      "isAdmin": true,
+      "approvedAt": "2026-03-30T10:00:00.000Z",
+      "rejectedAt": null,
+      "rejectionReason": null,
+      "createdAt": "2026-03-30T10:00:00.000Z"
+    },
+    "tokens": {
+      "accessToken": "jwt",
+      "refreshToken": "jwt"
+    }
+  }
+}
+```
+
+9. `POST /api/v1/auth/verify-otp`
+- Body:
+
+```json
+{
+  "email": "student@nitrkl.ac.in",
+  "code": "123456"
+}
+```
+
+- Returns:
+
+```json
+{
+  "data": {
+    "verified": true,
+    "user": {
+      "id": "uuid",
+      "email": "student@nitrkl.ac.in",
+      "emailVerified": true,
+      "otpVerifiedAt": "2026-03-30T11:00:00.000Z"
+    }
+  }
+}
+```
+
+10. `POST /api/v1/auth/resend-otp`
+- Body:
+
+```json
+{
+  "email": "student@nitrkl.ac.in"
+}
+```
+
+- Returns:
+
+```json
+{
+  "data": {
+    "sent": true,
+    "email": "student@nitrkl.ac.in",
+    "delivery": {
+      "destination": "s***@nitrkl.ac.in",
+      "medium": "EMAIL",
+      "attributeName": "email"
+    }
+  }
+}
+```
+
+11. `POST /api/v1/auth/login`
+- Body:
+
+```json
+{
+  "email": "student@nitrkl.ac.in",
+  "password": "Str0ngPass123"
+}
+```
+
+- Returns: same envelope as register.
+
+12. `POST /api/v1/auth/refresh`
+- Body:
+
+```json
+{
+  "refreshToken": "jwt"
+}
+```
+
+- Returns: same envelope as register with rotated tokens.
+
+13. `PUT /api/v1/auth/profile`
+- Header: `Authorization: Bearer <accessToken>`
+- Body (any subset):
+
+```json
+{
+  "bio": "Updated bio",
+  "interests": ["music", "photography", "coding"]
+}
+```
+
+- Returns `data` with updated user profile.
+
+14. `GET /api/v1/auth/me`
+- Header: `Authorization: Bearer <accessToken>`
+- Returns `data` with user profile.
+
+15. `POST /api/v1/auth/logout`
+- Header: `Authorization: Bearer <accessToken>`
+- Body:
+
+```json
+{
+  "refreshToken": "jwt"
+}
+```
+
+- Returns:
+
+```json
+{
+  "data": {
+    "success": true
+  }
+}
+```
+
+## Admin Approval Endpoints
+
+16. `GET /api/v1/admin/approvals/pending`
+- Header: `Authorization: Bearer <adminAccessToken>`
+- Returns `data` as list of pending users.
+
+17. `POST /api/v1/admin/approvals/{userId}/approve`
+- Header: `Authorization: Bearer <adminAccessToken>`
+- Returns `data` with updated approved user.
+
+18. `POST /api/v1/admin/approvals/{userId}/reject`
+- Header: `Authorization: Bearer <adminAccessToken>`
+- Body:
+
+```json
+{
+  "reason": "Invalid student details"
+}
+```
+
+- Returns `data` with updated rejected user.

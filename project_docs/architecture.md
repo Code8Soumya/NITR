@@ -1,6 +1,6 @@
 # Architecture Documentation
 
-**Last Updated**: 2026-03-29
+**Last Updated**: 2026-03-30
 
 ## Application Overview
 
@@ -24,7 +24,11 @@ Core features: NITR email verification (@nitrkl.ac.in), AI-powered peer matching
 - Frontend scaffold is initialized with Expo Router + TypeScript + NativeWind.
 - Tab-1 (Hype Feed) is implemented as an isolated module under `src/modules/hype/`.
 - Tab-1 backend is implemented under `backend/tab1-social/` with AWS Lambda-compatible handlers, Aurora SQL repository layer, and S3 pre-signed upload support.
+- Production auth and admin-approval flows are implemented in the same backend package (`/api/v1/auth/*`, `/api/v1/admin/*`) with JWT access/refresh tokens, secure password hashing, pending/approved/rejected account states, and Cognito OTP verification for registration.
+- Auth registration now captures Cognito-required attributes (`name`, `nickname`, `birthDate`, `gender`) and app profile fields (`bio`, `interests`) in PostgreSQL.
 - Tab-1 frontend `hypeApi.ts` now calls `/api/v1/social/*` HTTP endpoints and falls back to in-memory mock mode when `EXPO_PUBLIC_SOCIAL_API_BASE_URL` is missing.
+- Frontend now has a dedicated auth module (`src/modules/auth/`) with SecureStore-backed token persistence, login/register/pending-approval screens, admin approvals UI, profile editing screen, and route guards across auth/tabs/admin groups.
+- Frontend and backend now use centralized structured logging helpers (`src/shared/utils/logger.ts` and `backend/tab1-social/src/lib/logger.js`) so runtime failures include file, function/location, operation, and stack/root-cause context.
 - Tab-2 and Tab-3 are routed placeholders to preserve independent-tab architecture during phased delivery.
 - Project dependencies are upgraded to Expo SDK 54 and validated with `expo-doctor`.
 - Dependency pins include `react-dom@19.1.0` and `babel-preset-expo@~54.0.10` to keep npm resolution stable with SDK 54.
@@ -45,7 +49,7 @@ Core features: NITR email verification (@nitrkl.ac.in), AI-powered peer matching
 - **Real-time**: AWS AppSync (GraphQL + WebSocket subscriptions)
 - **AI/ML**: AWS Bedrock with Titan embeddings (1536 dimensions)
 - **Storage**: S3 + CloudFront CDN
-- **Auth**: AWS Cognito + SES for OTP
+- **Auth**: JWT access/refresh sessions + bcrypt password hashing + Cognito OTP verification
 
 ## Module Isolation Architecture
 
@@ -68,10 +72,8 @@ Each module contains:
 ## Database Schema
 
 ### Auth Tables
-- `users` - Core user accounts (linked to Cognito)
-- `user_profiles` - Extended profile info (gender, branch, year, bio)
-- `user_interests` - User interests for AI matching
-- `otp_verifications` - OTP codes for email verification
+- `auth.users` - Core app accounts (approval state, admin flags, Cognito OTP verification fields, `full_name`, `nickname`, `birth_date`, `gender`, `bio`, `interests`)
+- `auth.refresh_sessions` - Rotating refresh-token sessions (hashed token, expiry, revocation)
 
 ### Gamification Tables
 - `seasons` - 3-month leaderboard seasons
@@ -144,6 +146,7 @@ app/
 │   ├── hype/
 │   │   ├── index.tsx (Feed)
 │   │   ├── create.tsx (Create post)
+│   │   ├── profile.tsx (Profile editor)
 │   │   └── [postId].tsx (Post detail)
 │   ├── campus/
 │   │   ├── index.tsx (Q&A + Lost&Found with Boys/Girls/General sub-tabs)
@@ -168,7 +171,7 @@ app/
 **Base URL**: `/api/v1`
 
 ### Endpoints
-- `/auth` - Registration, OTP, login, token refresh
+- `/auth` - Registration, login, token refresh, profile
 - `/users` - Profile management, blocking
 - `/social` - Posts, photo/video upload, hypes, comments, hashtags
 - `/campus` - Lost & Found + Q&A endpoints
@@ -176,6 +179,19 @@ app/
 - `/leaderboard` - Boys/girls/general leaderboards, tiers
 - `/ai` - Peer matches (like, mutual matches)
 - `/admin` - User approval, reports, quest creation
+
+### Auth + Admin Endpoints (Implemented)
+- `POST /api/v1/auth/register`
+- `POST /api/v1/auth/login`
+- `POST /api/v1/auth/verify-otp`
+- `POST /api/v1/auth/resend-otp`
+- `PUT /api/v1/auth/profile`
+- `POST /api/v1/auth/refresh`
+- `POST /api/v1/auth/logout`
+- `GET /api/v1/auth/me`
+- `GET /api/v1/admin/approvals/pending`
+- `POST /api/v1/admin/approvals/{userId}/approve`
+- `POST /api/v1/admin/approvals/{userId}/reject`
 
 **WebSocket**: AppSync subscriptions for quest real-time features (messages, presence, typing indicators)
 
@@ -198,7 +214,12 @@ app/
 
 ## Key Implementation Details
 
-- **Email Verification**: Users register with @nitrkl.ac.in emails, receive OTP via SES, then await admin approval
+- **NITR Domain Registration**: Users register with @nitrkl.ac.in emails and await admin approval before social access.
+- **Nickname-First Identity**: `nickname` is the in-app username and is required at signup; full name is stored separately as `name`.
+- **Cognito OTP Verification**: When enabled, registration sends Cognito OTP to email; login is blocked until OTP confirmation succeeds.
+- **Profile Enrichment**: `bio` and `interests` can be provided at signup and updated later via `PUT /api/v1/auth/profile`.
+- **Account Approval Gate**: Non-admin users are created in `pending` state and are blocked from social endpoints until approved; rejected users are denied login.
+- **Admin Identity**: Admin bootstrap is env-driven via `ADMIN_EMAIL` and currently set to `122ME0914@nitrkl.ac.in` by default.
 - **Social Media Uploads**: Tab 1 supports photo and video uploads via S3 pre-signed URLs and CloudFront delivery; polls are removed from the posting flow
 - **Deployment Security Baseline**: Tab-1 backend is intended to run with Lambda in private app subnets, Aurora in private DB subnets, SG-restricted DB access (5432 from Lambda SG only), and least-privilege IAM policies
 - **Social Feed Pagination**: Cursor pagination implemented in backend (`nextCursor`) using `(created_at, id)` ordering for deterministic page boundaries
@@ -206,6 +227,7 @@ app/
 - **Hype/Comment Mutations**: Backend performs server-side validation, optimistic-friendly mutation responses, and proper author attribution from auth claims/dev headers
 - **WebSocket**: Daily Quest chat uses AppSync subscriptions for real-time messages, presence, and typing indicators
 - **Error Handling**: Each module has isolated error boundaries; tab crashes don't affect other tabs
+- **Observability Logging**: Root layout installs a global JS error handler; all major catch paths in auth/hype frontend and Tab-1 backend now emit structured logs with file-level context, request metadata (requestId/method/path), and serialized error details.
 - **AI Matching**: User profiles and interests converted to 1536-dim vectors using Bedrock Titan, matched using cosine similarity via pgvector for Daily Quest pairing
 - **Gender-Filtered Sub-tabs**: Tab 2 (Q&A + Lost & Found) has Boys/Girls/General sub-tabs. Content has `visibility_gender` field to control which sub-tab it appears in. Boys see Boys+General, Girls see Girls+General.
 - **Daily Quest**: 1-on-1 AI-matched chat, once per day, 30 messages to complete, profiles visible from start

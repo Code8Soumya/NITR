@@ -6,6 +6,8 @@ import {
   type HypeComment,
   type HypePost
 } from "@/modules/hype/types";
+import { tokenStorage } from "@/modules/auth/storage/tokenStorage";
+import { appLogger } from "@/shared/utils/logger";
 
 type ToggleHypeResult = {
   postId: string;
@@ -73,33 +75,57 @@ const devHeaders = (): Record<string, string> => {
 };
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  if (!apiBaseUrl) {
-    throw new Error("EXPO_PUBLIC_SOCIAL_API_BASE_URL is not configured");
+  const method = init?.method ?? "GET";
+
+  try {
+    if (!apiBaseUrl) {
+      throw new Error("EXPO_PUBLIC_SOCIAL_API_BASE_URL is not configured");
+    }
+
+    const tokens = await tokenStorage.getTokens();
+
+    const mergedHeaders = {
+      "Content-Type": "application/json",
+      ...(tokens?.accessToken ? { Authorization: `Bearer ${tokens.accessToken}` } : {}),
+      ...devHeaders(),
+      ...toHeaderRecord(init?.headers)
+    };
+
+    const response = await fetch(`${apiBaseUrl}${path}`, {
+      ...init,
+      headers: mergedHeaders
+    });
+
+    const raw = await response.text();
+    const parsed = raw ? (JSON.parse(raw) as { data?: T; error?: { message?: string } }) : {};
+
+    if (!response.ok) {
+      throw new Error(parsed.error?.message ?? `Request failed (${response.status})`);
+    }
+
+    if (parsed.data === undefined) {
+      throw new Error("Malformed API response: missing data");
+    }
+
+    return parsed.data;
+  } catch (error) {
+    appLogger.error(
+      "Hype API request failed",
+      {
+        file: "src/modules/hype/api/hypeApi.ts",
+        location: "request",
+        action: `${method} ${path}`,
+        details: {
+          method,
+          path,
+          usingMockFallback: !apiBaseUrl
+        }
+      },
+      error
+    );
+
+    throw error;
   }
-
-  const mergedHeaders = {
-    "Content-Type": "application/json",
-    ...devHeaders(),
-    ...toHeaderRecord(init?.headers)
-  };
-
-  const response = await fetch(`${apiBaseUrl}${path}`, {
-    ...init,
-    headers: mergedHeaders
-  });
-
-  const raw = await response.text();
-  const parsed = raw ? (JSON.parse(raw) as { data?: T; error?: { message?: string } }) : {};
-
-  if (!response.ok) {
-    throw new Error(parsed.error?.message ?? `Request failed (${response.status})`);
-  }
-
-  if (parsed.data === undefined) {
-    throw new Error("Malformed API response: missing data");
-  }
-
-  return parsed.data;
 }
 
 const mockApi = {
@@ -133,11 +159,11 @@ const mockApi = {
       hypeCount: 0,
       isHypedByMe: false,
       media:
-        payload.media?.map((item, index) => ({
+        payload.media.map((item, index) => ({
           id: `media-${Date.now()}-${index}`,
           uri: item.uri,
           mediaType: item.mediaType
-        })) ?? [],
+        })),
       comments: []
     };
 

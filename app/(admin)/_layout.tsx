@@ -1,9 +1,9 @@
-import { Redirect } from "expo-router";
+import { Redirect, Stack } from "expo-router";
 import { ActivityIndicator, View } from "react-native";
 
 import { useAuth } from "@/modules/auth/hooks/useAuth";
 
-export default function Index() {
+export default function AdminLayout() {
   const { bootstrapped, user } = useAuth();
 
   if (!bootstrapped) {
@@ -18,9 +18,9 @@ export default function Index() {
     return <Redirect href={"/(auth)/login" as never} />;
   }
 
-  if (user.approvalStatus !== "approved" && !user.isAdmin) {
-    return <Redirect href={"/(auth)/pending" as never} />;
+  if (!user.isAdmin) {
+    return <Redirect href={"/" as never} />;
   }
 
-  return <Redirect href={"/(tabs)/hype" as never} />;
+  return <Stack screenOptions={{ headerShown: false }} />;
 }

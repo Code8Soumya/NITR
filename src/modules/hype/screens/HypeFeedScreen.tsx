@@ -6,9 +6,11 @@ import { HashtagRail } from "@/modules/hype/components/HashtagRail";
 import { PostCard } from "@/modules/hype/components/PostCard";
 import { useHypeActions } from "@/modules/hype/hooks/useHypeActions";
 import { useHypeFeed } from "@/modules/hype/hooks/useHypeFeed";
+import { useAuth } from "@/modules/auth/hooks/useAuth";
 
 export function HypeFeedScreen() {
   const router = useRouter();
+  const { user } = useAuth();
   const { setActiveHashtag, toggleHype } = useHypeActions();
   const {
     visiblePosts,
@@ -37,6 +39,7 @@ export function HypeFeedScreen() {
               <Text className="mt-1 text-sm text-rose-100">
                 Share moments, media, and hashtags from around campus.
               </Text>
+              <Text className="mt-2 text-sm text-rose-100">Logged in as @{user?.nickname ?? "nitr"}</Text>
 
               <Pressable
                 className="mt-4 rounded-xl bg-rose-500 px-4 py-3"
@@ -44,6 +47,14 @@ export function HypeFeedScreen() {
                 onPress={() => router.push("/(tabs)/hype/create")}
               >
                 <Text className="text-center text-base font-semibold text-white">Create New Post</Text>
+              </Pressable>
+
+              <Pressable
+                className="mt-3 rounded-xl border border-rose-300 bg-[#262626] px-4 py-3"
+                android_ripple={{ color: "#3f3f46" }}
+                onPress={() => router.push("/(tabs)/hype/profile")}
+              >
+                <Text className="text-center text-base font-semibold text-rose-100">Edit Profile</Text>
               </Pressable>
             </View>
 

@@ -1,6 +1,8 @@
 import React, { type PropsWithChildren } from "react";
 import { Pressable, Text, View } from "react-native";
 
+import { appLogger } from "@/shared/utils/logger";
+
 type ModuleErrorBoundaryProps = PropsWithChildren<{
   moduleName: string;
 }>;
@@ -21,6 +23,22 @@ export class ModuleErrorBoundary extends React.Component<
 
   static getDerivedStateFromError(error: Error): ModuleErrorBoundaryState {
     return { hasError: true, message: error.message };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    appLogger.error(
+      "Module error boundary caught render error",
+      {
+        file: "src/shared/components/ModuleErrorBoundary.tsx",
+        location: "ModuleErrorBoundary.componentDidCatch",
+        action: "render module boundary",
+        details: {
+          moduleName: this.props.moduleName,
+          componentStack: errorInfo.componentStack
+        }
+      },
+      error
+    );
   }
 
   private resetBoundary = () => {
