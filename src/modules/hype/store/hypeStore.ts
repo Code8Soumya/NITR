@@ -26,6 +26,16 @@ type HypeState = {
 const sortByCreatedAt = (posts: HypePost[]) =>
   [...posts].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
+const mergeUpdatedComment = (existingComments: HypePost["comments"], nextComment: HypePost["comments"][number]) => {
+  const withoutCurrentUserComment = existingComments.filter(
+    (entry) => entry.userId !== nextComment.userId
+  );
+
+  return [...withoutCurrentUserComment, nextComment].sort(
+    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+  );
+};
+
 export const useHypeStore = create<HypeState>((set, get) => ({
   posts: [],
   isLoading: false,
@@ -179,7 +189,7 @@ export const useHypeStore = create<HypeState>((set, get) => ({
 
             return {
               ...post,
-              comments: [...post.comments, comment]
+              comments: mergeUpdatedComment(post.comments, comment)
             };
           })
         )

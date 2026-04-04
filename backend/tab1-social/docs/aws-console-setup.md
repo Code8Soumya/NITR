@@ -32,10 +32,10 @@ Suggested network plan:
 
 Routing best practice:
 
-- NAT-free profile (recommended for current Tab-1 backend): app private route table has no default internet route and DB private route table has no default internet route.
+- NAT-free profile: app private route table has no default internet route and DB private route table has no default internet route.
 - NAT profile (only when your Lambda must call public internet): public route table uses `0.0.0.0/0 -> Internet Gateway`, app private route table uses `0.0.0.0/0 -> NAT Gateway`, and DB private route table has no direct internet route.
 
-For the current codebase, NAT-free works because Lambda only needs private TCP access to Aurora and local signing for S3 pre-signed URLs.
+For this codebase with Cognito OTP enabled, Lambda must reach `cognito-idp` over HTTPS. In NAT-free mode, add a VPC interface endpoint for Cognito IDP.
 
 Recommended VPC endpoints:
 
@@ -44,6 +44,7 @@ Recommended VPC endpoints:
 - Secrets Manager Interface endpoint: use if Lambda fetches DB secret at runtime.
 - KMS Interface endpoint: use if Lambda calls KMS APIs directly.
 - STS Interface endpoint: use if Lambda calls STS directly.
+- Cognito IDP Interface endpoint: required in NAT-free mode when `COGNITO_OTP_ENABLED=true`.
 - For this backend's current default flow, endpoints are optional unless you add runtime AWS API calls.
 
 ## 2. Create Security Groups (Least Privilege)
@@ -66,6 +67,8 @@ Create these security groups:
   - `backend/tab1-social/sql/002_auth_and_admin.sql`
   - `backend/tab1-social/sql/003_auth_cognito_otp.sql`
   - `backend/tab1-social/sql/004_auth_profile_fields.sql`
+  - `backend/tab1-social/sql/005_comments_one_per_user.sql`
+  - `backend/tab1-social/sql/006_admin_bypass_and_auth_profile_sync.sql`
 
   Use Query Editor v2 or a migration runner that has VPC access.
 
@@ -89,16 +92,16 @@ Lambda env keys for this backend:
 
 - `DATABASE_URL`
 - `PG_SSL=true`
-- `PG_CONNECT_TIMEOUT_MS=15000`
+- `PG_CONNECT_TIMEOUT_MS=5000` (keep this below Lambda timeout so DB errors return before function timeout)
 - `AWS_REGION=ap-south-1`
 - `SOCIAL_MEDIA_BUCKET=<bucket-name>`
 - `SOCIAL_MEDIA_PUBLIC_BASE_URL=<cloudfront-url>`
+- `SOCIAL_MEDIA_READ_URL_EXPIRES_IN=3600`
 - `CORS_ALLOW_ORIGIN=<exact-origin-or-list>`
 - `EXPOSE_INTERNAL_ERRORS=false` (set `true` only for short debugging windows)
 - `DEFAULT_FEED_LIMIT=20`
 - `MAX_FEED_LIMIT=50`
 - `ENABLE_DEV_HEADERS=false` (production)
-- `ADMIN_EMAIL=122ME0914@nitrkl.ac.in`
 - `ACCESS_TOKEN_SECRET=<long-random-secret>`
 - `REFRESH_TOKEN_SECRET=<long-random-secret>`
 - `ACCESS_TOKEN_TTL=15m`
@@ -106,6 +109,8 @@ Lambda env keys for this backend:
 - `BCRYPT_ROUNDS=12`
 - `COGNITO_OTP_ENABLED=true`
 - `COGNITO_REGION=ap-south-1`
+- `COGNITO_MAX_ATTEMPTS=2`
+- `COGNITO_USER_POOL_ID=<cognito-user-pool-id>`
 - `COGNITO_USER_POOL_CLIENT_ID=<cognito-app-client-id>`
 - `COGNITO_USER_POOL_CLIENT_SECRET=<optional-if-secret-enabled>`
 
@@ -155,7 +160,8 @@ Custom inline policy (example baseline):
       "Action": [
         "cognito-idp:SignUp",
         "cognito-idp:ConfirmSignUp",
-        "cognito-idp:ResendConfirmationCode"
+        "cognito-idp:ResendConfirmationCode",
+        "cognito-idp:AdminUpdateUserAttributes"
       ],
       "Resource": "*"
     }
@@ -239,10 +245,18 @@ CORS:
 8. Set Lambda env vars:
   - `COGNITO_OTP_ENABLED=true`
   - `COGNITO_REGION`
+  - `COGNITO_MAX_ATTEMPTS=2`
   - `COGNITO_USER_POOL_CLIENT_ID`
   - `COGNITO_USER_POOL_CLIENT_SECRET` (only if the app client uses a secret)
-9. Keep `ENABLE_DEV_HEADERS=false` in production.
-10. API Gateway Cognito JWT authorizer is optional for this implementation because API auth still relies on app-issued JWT tokens.
+9. If login returns `INVALID_COGNITO_PARAMETERS` with message `USER_PASSWORD_AUTH flow not enabled for this client`, open Cognito Console -> User Pools -> App clients -> your app client -> Authentication flows and enable `ALLOW_USER_PASSWORD_AUTH`.
+10. Keep `ENABLE_DEV_HEADERS=false` in production.
+11. API Gateway Cognito JWT authorizer is optional for this implementation because API auth still relies on app-issued JWT tokens.
+12. If Lambda is in private subnets, provide outbound path to Cognito:
+  - Option A: NAT gateway route for app subnets.
+  - Option B: Interface VPC endpoint `com.amazonaws.<region>.cognito-idp` with endpoint SG allowing inbound 443 from Lambda SG.
+13. If register fails with `INVALID_COGNITO_PARAMETERS` and message `PrivateLink access is disabled for the user pool that has ManagedLogin configured`:
+  - Option A (stay on PrivateLink): enable PrivateLink access for that Cognito user pool.
+  - Option B (use public Cognito endpoint): remove/disable the `cognito-idp` interface endpoint private DNS and send traffic through NAT.
 
 ## 10. Frontend Env Setup
 
@@ -265,7 +279,7 @@ After deployment:
 2. `POST /api/v1/social/posts` creates a post.
 3. `GET /api/v1/social/posts` returns created post.
 4. `POST /api/v1/social/posts/{postId}/hypes` toggles hype.
-5. `POST /api/v1/social/posts/{postId}/comments` stores comment.
+5. `POST /api/v1/social/posts/{postId}/comments` upserts to one comment per user per post.
 6. `POST /api/v1/social/media/upload-url` returns `uploadUrl`, `publicUrl`, `key`.
 
 ## 12. Good-Practice Checklist

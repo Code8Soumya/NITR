@@ -1,6 +1,6 @@
 # Architecture Documentation
 
-**Last Updated**: 2026-03-30
+**Last Updated**: 2026-03-31
 
 ## Application Overview
 
@@ -25,8 +25,19 @@ Core features: NITR email verification (@nitrkl.ac.in), AI-powered peer matching
 - Tab-1 (Hype Feed) is implemented as an isolated module under `src/modules/hype/`.
 - Tab-1 backend is implemented under `backend/tab1-social/` with AWS Lambda-compatible handlers, Aurora SQL repository layer, and S3 pre-signed upload support.
 - Production auth and admin-approval flows are implemented in the same backend package (`/api/v1/auth/*`, `/api/v1/admin/*`) with JWT access/refresh tokens, secure password hashing, pending/approved/rejected account states, and Cognito OTP verification for registration.
+  - **AWS Cognito PrivateLink strict constraint**: Do NOT enable "Managed Login" (Hosted UI) in the AWS Cognito User Pool. AWS PrivateLink (VPC Interface Endpoints for `cognito-idp`) throws `INVALID_COGNITO_PARAMETERS` regarding PrivateLink API access if Managed Login is enabled on the domain.
+- Cognito OTP in private-subnet Lambda supports either NAT egress to public `cognito-idp` or `com.amazonaws.<region>.cognito-idp` interface endpoint with user-pool PrivateLink enabled.
 - Auth registration now captures Cognito-required attributes (`name`, `nickname`, `birthDate`, `gender`) and app profile fields (`bio`, `interests`) in PostgreSQL.
+- Auth profile updates now support `name`, `nickname`, `branch`, `bio`, and `interests` while keeping `email`, `birthDate`, and `gender` immutable after signup.
+- Register screen now uses calendar-based birthdate selection via `@react-native-community/datetimepicker` to avoid malformed date input.
 - Tab-1 frontend `hypeApi.ts` now calls `/api/v1/social/*` HTTP endpoints and falls back to in-memory mock mode when `EXPO_PUBLIC_SOCIAL_API_BASE_URL` is missing.
+- Tab-1 create-post flow now uses `expo-image-picker` to select local photo/video media and uploads binary files via `/api/v1/social/media/upload-url` before creating the post.
+- Tab-1 create-post now enforces allowed media aspect ratios (`9:16`, `16:9`, `3:4`, `4:3`, `1:1`, `4:5`) for photos/videos and opens a photo crop window with the selected target ratio before upload.
+- Tab-1 feed cards now render both photos and videos with aspect-ratio-aware containers, contain-fit media rendering, muted autoplay while in-view, and explicit mute/pause controls on video posts.
+- Tab-1 post creation now enforces a maximum of 5 unique hashtags per caption in both frontend and backend validation.
+- Tab-1 social read APIs (`GET /api/v1/social/posts`, `GET /api/v1/social/posts/{postId}`) now hydrate `authorBio` from `auth.users.bio` so feed/header metadata reflects current profile bio.
+- Tab-1 backend now enforces one comment per user per post: repeated comment submissions update the existing comment instead of creating duplicates.
+- Tab-1 media hydration now resolves S3-backed media into signed read URLs when needed, and media public base URL handling auto-normalizes missing schemes to keep feed images renderable.
 - Frontend now has a dedicated auth module (`src/modules/auth/`) with SecureStore-backed token persistence, login/register/pending-approval screens, admin approvals UI, profile editing screen, and route guards across auth/tabs/admin groups.
 - Frontend and backend now use centralized structured logging helpers (`src/shared/utils/logger.ts` and `backend/tab1-social/src/lib/logger.js`) so runtime failures include file, function/location, operation, and stack/root-cause context.
 - Tab-2 and Tab-3 are routed placeholders to preserve independent-tab architecture during phased delivery.
@@ -40,6 +51,9 @@ Core features: NITR email verification (@nitrkl.ac.in), AI-powered peer matching
 - **SDK**: Expo SDK 54
 - **Target Platform**: Android (Primary targeted platform. Code must be optimized for Android APK/AAB distribution, strictly avoiding Web-only DOM APIs).
 - **Styling**: NativeWind (Tailwind CSS for React Native)
+- **Media Selection**: expo-image-picker
+- **Video Playback**: expo-av
+- **Date Selection**: @react-native-community/datetimepicker
 - **State Management**: Zustand (isolated stores per module)
 - **Navigation**: Expo Router file-based routing
 
@@ -217,11 +231,19 @@ app/
 - **NITR Domain Registration**: Users register with @nitrkl.ac.in emails and await admin approval before social access.
 - **Nickname-First Identity**: `nickname` is the in-app username and is required at signup; full name is stored separately as `name`.
 - **Cognito OTP Verification**: When enabled, registration sends Cognito OTP to email; login is blocked until OTP confirmation succeeds.
-- **Profile Enrichment**: `bio` and `interests` can be provided at signup and updated later via `PUT /api/v1/auth/profile`.
-- **Account Approval Gate**: Non-admin users are created in `pending` state and are blocked from social endpoints until approved; rejected users are denied login.
-- **Admin Identity**: Admin bootstrap is env-driven via `ADMIN_EMAIL` and currently set to `122ME0914@nitrkl.ac.in` by default.
-- **Social Media Uploads**: Tab 1 supports photo and video uploads via S3 pre-signed URLs and CloudFront delivery; polls are removed from the posting flow
+- **Profile Enrichment**: `bio` and `interests` can be provided at signup and updated later via `PUT /api/v1/auth/profile`; profile updates also support `name`, `nickname`, and `branch`.
+- **Live Author Bio in Feed**: Feed/detail post responses hydrate `authorBio` from `auth.users.bio` at read-time rather than relying only on post snapshot fields.
+- **Immutable Profile Fields**: `email`, `birthDate`, and `gender` are locked after registration and rejected in profile patch requests.
+- **Account Approval Gate**: Every new account starts pending admin approval except `122me0914@nitrkl.ac.in`, which is auto-approved and marked admin.
+- **Cognito Profile Sync**: When OTP mode is enabled, profile updates sync `name` and `nickname` to Cognito using `AdminUpdateUserAttributes` (requires `COGNITO_USER_POOL_ID`).
+- **Social Media Uploads**: Tab 1 supports photo and video uploads via gallery selection on create-post, S3 pre-signed uploads, and CloudFront delivery; manual media URL entry is removed from the primary posting flow.
+- **Media Aspect Policy (Frontend)**: Users can submit only `9:16`, `16:9`, `3:4`, `4:3`, `1:1`, or `4:5` assets from gallery pick flow, and photo picks use a crop window constrained to the selected allowed ratio.
+- **Feed Video UX**: Videos autoplay muted when cards become visible in feed viewport, media uses contain-fit rendering for both photos/videos, and users can reliably toggle mute/pause per card.
+- **Hashtag Limit Rule**: Captions can include at most 5 unique hashtags; backend rejects overflow with `HASHTAG_LIMIT_EXCEEDED`.
+- **Comment Upsert Rule**: For Tab-1 comments, each user can keep only one comment per post; submitting again updates that existing comment.
+- **Media Read Resilience**: Feed/detail media URIs are normalized and can be signed for read access from S3-backed object keys to avoid invisible photos caused by inaccessible direct object URLs.
 - **Deployment Security Baseline**: Tab-1 backend is intended to run with Lambda in private app subnets, Aurora in private DB subnets, SG-restricted DB access (5432 from Lambda SG only), and least-privilege IAM policies
+- **Cognito Runtime Network Requirement**: When `COGNITO_OTP_ENABLED=true`, Lambda must have outbound HTTPS access to Cognito IDP (`cognito-idp`) via NAT egress or an interface VPC endpoint in private-subnet deployments.
 - **Social Feed Pagination**: Cursor pagination implemented in backend (`nextCursor`) using `(created_at, id)` ordering for deterministic page boundaries
 - **Hashtag Indexing**: Captions are parsed server-side and persisted in `social.hashtags` + `social.post_hashtags` for feed filtering and trending queries
 - **Hype/Comment Mutations**: Backend performs server-side validation, optimistic-friendly mutation responses, and proper author attribution from auth claims/dev headers

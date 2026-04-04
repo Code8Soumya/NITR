@@ -1,8 +1,9 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocalSearchParams } from "expo-router";
 import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { useAuth } from "@/modules/auth/hooks/useAuth";
 import { CommentBubble } from "@/modules/hype/components/CommentBubble";
 import { PostCard } from "@/modules/hype/components/PostCard";
 import { useHypeActions } from "@/modules/hype/hooks/useHypeActions";
@@ -10,12 +11,27 @@ import { useHypeStore } from "@/modules/hype/store/hypeStore";
 
 export function PostDetailScreen() {
   const { postId } = useLocalSearchParams<{ postId: string }>();
+  const { user } = useAuth();
   const posts = useHypeStore((state) => state.posts);
   const { toggleHype, addComment } = useHypeActions();
 
   const [comment, setComment] = useState("");
 
   const post = useMemo(() => posts.find((entry) => entry.id === postId), [posts, postId]);
+
+  const myExistingComment = useMemo(() => {
+    if (!post || !user?.id) {
+      return undefined;
+    }
+
+    return post.comments.find((entry) => entry.userId === user.id);
+  }, [post, user?.id]);
+
+  useEffect(() => {
+    if (myExistingComment) {
+      setComment(myExistingComment.body);
+    }
+  }, [myExistingComment?.id, post?.id]);
 
   if (!post) {
     return (
@@ -30,7 +46,7 @@ export function PostDetailScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-[#fffaf2]" edges={["top"]}>
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 30 }}>
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 10, paddingTop: 12, paddingBottom: 30 }}>
         <PostCard
           post={post}
           onOpen={() => {}}
@@ -55,7 +71,7 @@ export function PostDetailScreen() {
 
           <TextInput
             className="mt-4 rounded-xl border border-slate-300 px-4 py-3 text-base text-slate-900"
-            placeholder="Write a comment"
+            placeholder={myExistingComment ? "Edit your comment" : "Write a comment"}
             placeholderTextColor="#94a3b8"
             value={comment}
             onChangeText={setComment}
@@ -71,10 +87,12 @@ export function PostDetailScreen() {
               }
 
               void addComment({ postId: post.id, body: trimmed });
-              setComment("");
+              setComment(trimmed);
             }}
           >
-            <Text className="text-center text-base font-semibold text-white">Post Comment</Text>
+            <Text className="text-center text-base font-semibold text-white">
+              {myExistingComment ? "Update Comment" : "Post Comment"}
+            </Text>
           </Pressable>
         </View>
       </ScrollView>

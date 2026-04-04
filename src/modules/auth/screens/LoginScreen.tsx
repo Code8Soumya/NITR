@@ -1,14 +1,14 @@
 import { Link, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useAuth } from "@/modules/auth/hooks/useAuth";
-import { appLogger } from "@/shared/utils/logger";
+import { AnimatedPressable } from "@/shared/components/AnimatedPressable";
 
 export function LoginScreen() {
   const router = useRouter();
-  const { login, busy, error, clearError, isAuthenticated, isApproved, isAdmin } = useAuth();
+  const { login, busy, error, clearError, isAuthenticated, isApproved } = useAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -33,28 +33,25 @@ export function LoginScreen() {
         email,
         password
       });
-    } catch (error) {
-      appLogger.error(
-        "Login screen submit failed",
-        {
-          file: "src/modules/auth/screens/LoginScreen.tsx",
-          location: "LoginScreen.onSubmit",
-          action: "submit login form",
-          details: {
-            email
-          }
-        },
-        error
-      );
+    } catch (e: any) {
+      const code = typeof e?.code === "string" ? e.code : "";
+      const msg = e instanceof Error ? e.message : String(e);
 
-      // Error is caught and stored in authStore, so the UI will display it.
+      if (code === "OTP_VERIFICATION_REQUIRED" || msg.includes("OTP_VERIFICATION_REQUIRED")) {
+        router.push({ pathname: "/(auth)/verify-otp", params: { email } });
+      }
+
+      if (code === "USER_NOT_FOUND" || msg.includes("USER_NOT_FOUND")) {
+        // We override the default store error string to show a cleaner message
+        // though authStore will also have its error state populated.
+      }
     }
   };
 
   return (
     <SafeAreaView className="flex-1 bg-amber-50 px-5 py-6">
-      <View className="mb-8 mt-6">
-        <Text className="text-4xl font-black text-stone-900">NITR HUB</Text>
+      <View className="mb-8 mt-8">
+        <Text className="text-3xl font-black text-stone-900">Welcome back</Text>
         <Text className="mt-2 text-base text-stone-700">
           Login with your NIT Rourkela email to continue.
         </Text>
@@ -89,16 +86,15 @@ export function LoginScreen() {
 
         {error ? <Text className="text-sm text-red-700">{error}</Text> : null}
 
-        <Pressable
+        <AnimatedPressable
           disabled={busy}
           onPress={onSubmit}
           className="rounded-2xl bg-rose-600 px-4 py-3"
-          style={({ pressed }) => ({ opacity: pressed || busy ? 0.85 : 1 })}
         >
           <Text className="text-center text-base font-bold text-white">
             {busy ? "Signing in..." : "Sign in"}
           </Text>
-        </Pressable>
+        </AnimatedPressable>
       </View>
 
       <View className="mt-5 flex-row justify-center gap-2">

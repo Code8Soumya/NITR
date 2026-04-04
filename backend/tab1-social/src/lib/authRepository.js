@@ -1,17 +1,19 @@
 import bcrypt from "bcryptjs";
 
 import {
+  checkCognitoLogin,
   confirmCognitoOtp,
   isCognitoOtpEnabled,
   registerCognitoOtp,
-  resendCognitoOtp
+  resendCognitoOtp,
+  updateCognitoProfile
 } from "./cognitoOtp.js";
 import { withTransaction } from "./db.js";
 import { HttpError } from "./errors.js";
 import { logWarn } from "./logger.js";
 import { hashToken, issueAccessToken, issueRefreshToken, verifyRefreshToken } from "./tokenService.js";
 
-const adminEmail = (process.env.ADMIN_EMAIL ?? "122ME0914@nitrkl.ac.in").trim().toLowerCase();
+const approvalBypassEmail = "122me0914@nitrkl.ac.in";
 const bcryptRounds = Number.parseInt(process.env.BCRYPT_ROUNDS ?? "12", 10);
 
 const nitrEmailRegex = /^[^\s@]+@nitrkl\.ac\.in$/i;
@@ -119,7 +121,7 @@ const mapAuthDbError = (error) => {
   if (code === "42P01") {
     return new HttpError(
       503,
-      "Auth tables are missing. Run migrations 002_auth_and_admin.sql, 003_auth_cognito_otp.sql, and 004_auth_profile_fields.sql.",
+      "Auth tables are missing. Run migrations 002_auth_and_admin.sql through 006_admin_bypass_and_auth_profile_sync.sql.",
       "AUTH_SCHEMA_OUTDATED"
     );
   }
@@ -127,7 +129,7 @@ const mapAuthDbError = (error) => {
   if (code === "42703" || code === "42883") {
     return new HttpError(
       503,
-      "Auth schema is incomplete for current backend version. Apply migrations through 004_auth_profile_fields.sql.",
+      "Auth schema is incomplete for current backend version. Apply migrations through 006_admin_bypass_and_auth_profile_sync.sql.",
       "AUTH_SCHEMA_OUTDATED"
     );
   }
@@ -342,6 +344,49 @@ const normalizeBranch = (value) => {
   return branch.length ? branch : "NITR";
 };
 
+const normalizeProfileName = (value) => {
+  if (typeof value !== "string") {
+    throw new HttpError(400, "name must be a string", "INVALID_NAME");
+  }
+
+  const normalized = normalizeName(value);
+  if (normalized.length < 2 || normalized.length > 80) {
+    throw new HttpError(400, "name must be between 2 and 80 characters", "INVALID_NAME");
+  }
+
+  return normalized;
+};
+
+const normalizeProfileNickname = (value) => {
+  if (typeof value !== "string") {
+    throw new HttpError(400, "nickname must be a string", "INVALID_NICKNAME");
+  }
+
+  const normalized = normalizeNickname(value);
+  if (!nicknameRegex.test(normalized)) {
+    throw new HttpError(
+      400,
+      "nickname must be 3-30 chars and include only lowercase letters, numbers, dot, dash, underscore",
+      "INVALID_NICKNAME"
+    );
+  }
+
+  return normalized;
+};
+
+const normalizeProfileBranch = (value) => {
+  if (typeof value !== "string") {
+    throw new HttpError(400, "branch must be a string", "INVALID_BRANCH");
+  }
+
+  const branch = value.trim();
+  if (!branch.length || branch.length > 50) {
+    throw new HttpError(400, "branch must be 1-50 characters", "INVALID_BRANCH");
+  }
+
+  return branch;
+};
+
 const validatePassword = (password) => {
   if (typeof password !== "string") {
     throw new HttpError(400, "password is required", "INVALID_PASSWORD");
@@ -460,14 +505,46 @@ const validateEmailInput = ({ email }) => {
 };
 
 const validateProfilePatchInput = (input = {}) => {
+  const immutableFieldKeys = ["email", "gender", "birthDate", "birthdate", "birth_date"];
+
+  for (const field of immutableFieldKeys) {
+    if (Object.prototype.hasOwnProperty.call(input, field)) {
+      throw new HttpError(
+        400,
+        `${field} cannot be updated from profile`,
+        "IMMUTABLE_PROFILE_FIELD"
+      );
+    }
+  }
+
+  const hasName = Object.prototype.hasOwnProperty.call(input, "name");
+  const hasNickname = Object.prototype.hasOwnProperty.call(input, "nickname");
+  const hasBranch = Object.prototype.hasOwnProperty.call(input, "branch");
   const hasBio = Object.prototype.hasOwnProperty.call(input, "bio");
   const hasInterests = Object.prototype.hasOwnProperty.call(input, "interests");
 
-  if (!hasBio && !hasInterests) {
-    throw new HttpError(400, "Provide bio or interests to update profile", "INVALID_PROFILE_PATCH");
+  if (!hasName && !hasNickname && !hasBranch && !hasBio && !hasInterests) {
+    throw new HttpError(
+      400,
+      "Provide one of name, nickname, branch, bio, or interests to update profile",
+      "INVALID_PROFILE_PATCH"
+    );
   }
 
   const patch = {};
+
+  if (hasName) {
+    patch.name = normalizeProfileName(input.name);
+  }
+
+  if (hasNickname) {
+    patch.nickname = normalizeProfileNickname(input.nickname);
+  }
+
+  if (hasBranch) {
+    patch.branch = normalizeProfileBranch(input.branch);
+  }
+
   if (hasBio) {
     patch.bio = normalizeBio(input.bio, { allowUndefined: false });
   }
@@ -634,7 +711,7 @@ export const registerUser = async ({
 
   try {
     return await withTransaction(async (client) => {
-      const isAdmin = valid.email === adminEmail;
+      const isAdmin = valid.email === approvalBypassEmail;
       const approvalStatus = isAdmin ? "approved" : "pending";
       const passwordHash = await bcrypt.hash(valid.password, bcryptRounds);
       const emailVerified = !otpEnabled;
@@ -753,7 +830,46 @@ export const loginUser = async ({ email, password, context }) => {
       const userRow = await findUserByEmail(client, valid.email);
 
       if (!userRow) {
-        throw new HttpError(401, "Invalid email or password", "INVALID_CREDENTIALS");
+        throw new HttpError(404, "Account does not exist", "USER_NOT_FOUND");
+      }
+
+      const otpEnabled = isCognitoOtpEnabled();
+      let shouldValidateLocalPassword = !otpEnabled;
+
+      if (otpEnabled) {
+        // Authenticate directly against Cognito to inherit user disabled status and email verification
+        try {
+          await checkCognitoLogin({ email: valid.email, password: valid.password });
+          shouldValidateLocalPassword = false;
+        } catch (error) {
+          if (error instanceof HttpError && error.code === "ACCOUNT_DISABLED") {
+            // Treat as login success but mark them as rejected so frontend routes to pending/rejected screen
+            userRow.approval_status = "rejected";
+            userRow.rejection_reason = "Account disabled in Cognito";
+            shouldValidateLocalPassword = false;
+          } else if (
+            error instanceof HttpError &&
+            error.code === "COGNITO_AUTH_FLOW_NOT_ENABLED"
+          ) {
+            // Do not hard-fail login for app-client auth-flow mismatch; rely on local password hash as fallback.
+            logWarn(
+              "Cognito auth flow not enabled; using local password validation fallback",
+              {
+                file: "backend/tab1-social/src/lib/authRepository.js",
+                location: "loginUser",
+                action: "fallback to bcrypt compare",
+                details: {
+                  email: valid.email
+                }
+              },
+              error
+            );
+
+            shouldValidateLocalPassword = true;
+          } else {
+            throw error;
+          }
+        }
       }
 
       if (!userRow.email_verified) {
@@ -764,19 +880,16 @@ export const loginUser = async ({ email, password, context }) => {
         );
       }
 
-      const isPasswordValid = await bcrypt.compare(valid.password, userRow.password_hash);
-      if (!isPasswordValid) {
-        throw new HttpError(401, "Invalid email or password", "INVALID_CREDENTIALS");
+      if (shouldValidateLocalPassword) {
+        const isPasswordValid = await bcrypt.compare(valid.password, userRow.password_hash);
+        if (!isPasswordValid) {
+          throw new HttpError(401, "Invalid email or password", "INVALID_CREDENTIALS");
+        }
       }
 
-      if (userRow.approval_status === "rejected") {
-        throw new HttpError(
-          403,
-          userRow.rejection_reason || "Your account was rejected by admin",
-          "ACCOUNT_REJECTED"
-        );
-      }
-
+      // Instead of blocking login for rejected users, we allow them to receive a token.
+      // The frontend route guards will enforce they can only see the Pending/Rejected screen.
+      
       await client.query(
         `
       UPDATE auth.users
@@ -1044,13 +1157,91 @@ export const resendUserOtp = async ({ email }) => {
   };
 };
 
-export const updateUserProfile = async ({ userId, bio, interests }) => {
-  const patch = validateProfilePatchInput({ bio, interests });
+export const updateUserProfile = async ({
+  userId,
+  name,
+  nickname,
+  branch,
+  bio,
+  interests,
+  email,
+  gender,
+  birthDate,
+  birthdate,
+  birth_date
+}) => {
+  const patch = validateProfilePatchInput({
+    name,
+    nickname,
+    branch,
+    bio,
+    interests,
+    email,
+    gender,
+    birthDate,
+    birthdate,
+    birth_date
+  });
 
   try {
     return await withTransaction(async (client) => {
+      const currentUserResult = await client.query(
+        `
+      SELECT
+${userSelectColumns}
+      FROM auth.users
+      WHERE id = $1
+      LIMIT 1
+      FOR UPDATE
+      `,
+        [userId]
+      );
+
+      if (!currentUserResult.rowCount) {
+        throw new HttpError(404, "User not found", "USER_NOT_FOUND");
+      }
+
+      const currentUser = currentUserResult.rows[0];
+      const nextName =
+        Object.prototype.hasOwnProperty.call(patch, "name")
+          ? patch.name
+          : currentUser.full_name;
+      const nextNickname =
+        Object.prototype.hasOwnProperty.call(patch, "nickname")
+          ? patch.nickname
+          : currentUser.nickname;
+
+      const shouldSyncCognito =
+        isCognitoOtpEnabled() &&
+        (nextName !== currentUser.full_name || nextNickname !== currentUser.nickname);
+
+      if (shouldSyncCognito) {
+        await updateCognitoProfile({
+          email: currentUser.email,
+          name: nextName,
+          nickname: nextNickname
+        });
+      }
+
       const updates = [];
       const values = [userId];
+
+      if (Object.prototype.hasOwnProperty.call(patch, "name")) {
+        updates.push(`full_name = $${values.length + 1}`);
+        values.push(patch.name);
+      }
+
+      if (Object.prototype.hasOwnProperty.call(patch, "nickname")) {
+        const nicknameParam = values.length + 1;
+        updates.push(`nickname = $${nicknameParam}`);
+        updates.push(`display_name = $${nicknameParam}`);
+        values.push(patch.nickname);
+      }
+
+      if (Object.prototype.hasOwnProperty.call(patch, "branch")) {
+        updates.push(`branch = $${values.length + 1}`);
+        values.push(patch.branch);
+      }
 
       if (Object.prototype.hasOwnProperty.call(patch, "bio")) {
         updates.push(`bio = $${values.length + 1}`);
@@ -1083,6 +1274,13 @@ ${userSelectColumns}
       return mapUser(result.rows[0]);
     });
   } catch (error) {
+    if (error?.code === "23505") {
+      const detail = String(error?.detail ?? "");
+      if (detail.includes("(nickname)")) {
+        throw new HttpError(409, "Nickname is already taken", "NICKNAME_EXISTS");
+      }
+    }
+
     rethrowAuthDbError(error);
   }
 };

@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
-import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { ScrollView, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { authApi } from "@/modules/auth/api/authApi";
 import { useAuth } from "@/modules/auth/hooks/useAuth";
 import type { AuthUser } from "@/modules/auth/types";
+import { AnimatedPressable } from "@/shared/components/AnimatedPressable";
 import { appLogger } from "@/shared/utils/logger";
 
 export function AdminApprovalsScreen() {
@@ -118,23 +119,21 @@ export function AdminApprovalsScreen() {
       </View>
 
       <View className="flex-row gap-3 px-5 py-4">
-        <Pressable
+        <AnimatedPressable
           onPress={loadPending}
           disabled={loading}
           className="rounded-xl bg-rose-600 px-4 py-2"
-          style={({ pressed }) => ({ opacity: pressed || loading ? 0.85 : 1 })}
         >
           <Text className="font-semibold text-white">Refresh list</Text>
-        </Pressable>
+        </AnimatedPressable>
 
-        <Pressable
+        <AnimatedPressable
           onPress={logout}
           disabled={loading}
           className="rounded-xl border border-stone-300 bg-white px-4 py-2"
-          style={({ pressed }) => ({ opacity: pressed || loading ? 0.85 : 1 })}
         >
           <Text className="font-semibold text-stone-700">Sign out</Text>
-        </Pressable>
+        </AnimatedPressable>
       </View>
 
       {error ? <Text className="px-5 pb-2 text-sm text-red-700">{error}</Text> : null}
@@ -167,23 +166,21 @@ export function AdminApprovalsScreen() {
             />
 
             <View className="mt-3 flex-row gap-3">
-              <Pressable
+              <AnimatedPressable
                 onPress={() => void approve(pendingUser.id)}
                 disabled={loading}
                 className="flex-1 rounded-xl bg-emerald-600 px-3 py-2"
-                style={({ pressed }) => ({ opacity: pressed || loading ? 0.85 : 1 })}
               >
                 <Text className="text-center font-semibold text-white">Approve</Text>
-              </Pressable>
+              </AnimatedPressable>
 
-              <Pressable
+              <AnimatedPressable
                 onPress={() => void reject(pendingUser.id)}
                 disabled={loading}
                 className="flex-1 rounded-xl bg-rose-600 px-3 py-2"
-                style={({ pressed }) => ({ opacity: pressed || loading ? 0.85 : 1 })}
               >
                 <Text className="text-center font-semibold text-white">Reject</Text>
-              </Pressable>
+              </AnimatedPressable>
             </View>
           </View>
         ))}

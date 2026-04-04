@@ -4,8 +4,10 @@ import {
   type CreatePostPayload,
   type FeedQuery,
   type HypeComment,
+  type HypeMediaType,
   type HypePost
 } from "@/modules/hype/types";
+import { getAspectRatioValueFromLabel } from "@/modules/hype/utils/mediaAspectRatio";
 import { tokenStorage } from "@/modules/auth/storage/tokenStorage";
 import { appLogger } from "@/shared/utils/logger";
 
@@ -15,11 +17,21 @@ type ToggleHypeResult = {
   isHypedByMe: boolean;
 };
 
+type MediaUploadPayload = {
+  key: string;
+  uploadUrl: string;
+  publicUrl: string;
+  expiresIn: number;
+};
+
 const CURRENT_USER = {
   id: "user-current",
   name: "You",
-  branch: "NITR"
+  branch: "NITR",
+  bio: "Always around campus with a camera and chai."
 };
+
+const MAX_HASHTAGS_PER_POST = 5;
 
 const apiBaseUrl = process.env.EXPO_PUBLIC_SOCIAL_API_BASE_URL?.replace(/\/$/, "");
 
@@ -30,6 +42,58 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const normalizeHashtags = (caption: string): string[] => {
   const matched = caption.match(/#[a-zA-Z0-9_]+/g) ?? [];
   return Array.from(new Set(matched.map((tag) => tag.toLowerCase())));
+};
+
+const validateHashtagLimit = (caption: string): string[] => {
+  const hashtags = normalizeHashtags(caption);
+  if (hashtags.length > MAX_HASHTAGS_PER_POST) {
+    throw new Error(`Use at most ${MAX_HASHTAGS_PER_POST} hashtags in one post`);
+  }
+
+  return hashtags;
+};
+
+const isRemoteUri = (uri: string): boolean => /^https?:\/\//i.test(uri);
+
+const defaultMimeType = (mediaType: HypeMediaType): string =>
+  mediaType === "video" ? "video/mp4" : "image/jpeg";
+
+const inferFileName = (uri: string, mediaType: HypeMediaType): string => {
+  const fromUri = uri.split("?")[0]?.split("#")[0]?.split("/").pop()?.trim();
+  if (fromUri) {
+    return fromUri;
+  }
+
+  const extension = mediaType === "video" ? "mp4" : "jpg";
+  return `upload-${Date.now()}.${extension}`;
+};
+
+const uploadMediaBinary = async ({
+  localUri,
+  uploadUrl,
+  mimeType
+}: {
+  localUri: string;
+  uploadUrl: string;
+  mimeType: string;
+}): Promise<void> => {
+  const localResponse = await fetch(localUri);
+  if (!localResponse.ok) {
+    throw new Error("Unable to read selected media file");
+  }
+
+  const fileBlob = await localResponse.blob();
+  const uploadResponse = await fetch(uploadUrl, {
+    method: "PUT",
+    headers: {
+      "Content-Type": mimeType
+    },
+    body: fileBlob
+  });
+
+  if (!uploadResponse.ok) {
+    throw new Error(`Media upload failed (${uploadResponse.status})`);
+  }
 };
 
 const toHeaderRecord = (headers?: HeadersInit): Record<string, string> => {
@@ -146,13 +210,14 @@ const mockApi = {
   async createPost(payload: CreatePostPayload): Promise<HypePost> {
     await sleep(180);
 
-    const hashtags = normalizeHashtags(payload.caption);
+    const hashtags = validateHashtagLimit(payload.caption);
 
     const post: HypePost = {
       id: `post-${Date.now()}`,
       userId: CURRENT_USER.id,
       authorName: CURRENT_USER.name,
       authorBranch: CURRENT_USER.branch,
+      authorBio: CURRENT_USER.bio,
       caption: payload.caption.trim(),
       hashtags,
       createdAt: new Date().toISOString(),
@@ -162,7 +227,11 @@ const mockApi = {
         payload.media.map((item, index) => ({
           id: `media-${Date.now()}-${index}`,
           uri: item.uri,
-          mediaType: item.mediaType
+          mediaType: item.mediaType,
+          aspectRatioLabel: item.aspectRatioLabel,
+          aspectRatio: item.aspectRatioLabel
+            ? getAspectRatioValueFromLabel(item.aspectRatioLabel)
+            : undefined
         })),
       comments: []
     };
@@ -207,23 +276,41 @@ const mockApi = {
   async addComment(payload: AddCommentPayload): Promise<HypeComment> {
     await sleep(150);
 
-    const comment: HypeComment = {
-      id: `comment-${Date.now()}`,
-      postId: payload.postId,
-      userId: CURRENT_USER.id,
-      displayName: CURRENT_USER.name,
-      body: payload.body.trim(),
-      createdAt: new Date().toISOString()
-    };
+    const nextCreatedAt = new Date().toISOString();
+    const existingComment = feedDb
+      .find((post) => post.id === payload.postId)
+      ?.comments.find((entry) => entry.userId === CURRENT_USER.id);
+
+    const comment: HypeComment = existingComment
+      ? {
+          ...existingComment,
+          displayName: CURRENT_USER.name,
+          body: payload.body.trim(),
+          createdAt: nextCreatedAt
+        }
+      : {
+          id: `comment-${Date.now()}`,
+          postId: payload.postId,
+          userId: CURRENT_USER.id,
+          displayName: CURRENT_USER.name,
+          body: payload.body.trim(),
+          createdAt: nextCreatedAt
+        };
 
     feedDb = feedDb.map((post) => {
       if (post.id !== payload.postId) {
         return post;
       }
 
+      const withoutCurrentUserComment = post.comments.filter(
+        (entry) => entry.userId !== CURRENT_USER.id
+      );
+
       return {
         ...post,
-        comments: [...post.comments, comment]
+        comments: [...withoutCurrentUserComment, comment].sort(
+          (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+        )
       };
     });
 
@@ -252,10 +339,66 @@ export const hypeApi = {
       return mockApi.createPost(payload);
     }
 
-    return request<HypePost>("/api/v1/social/posts", {
-      method: "POST",
-      body: JSON.stringify(payload)
-    });
+    try {
+      validateHashtagLimit(payload.caption);
+
+      const uploadedMedia = await Promise.all(
+        payload.media.map(async (item) => {
+          if (isRemoteUri(item.uri)) {
+            return {
+              uri: item.uri,
+              mediaType: item.mediaType
+            };
+          }
+
+          const mimeType = item.mimeType?.trim() || defaultMimeType(item.mediaType);
+          const fileName = item.fileName?.trim() || inferFileName(item.uri, item.mediaType);
+
+          const upload = await request<MediaUploadPayload>("/api/v1/social/media/upload-url", {
+            method: "POST",
+            body: JSON.stringify({
+              fileName,
+              mimeType,
+              mediaType: item.mediaType
+            })
+          });
+
+          await uploadMediaBinary({
+            localUri: item.uri,
+            uploadUrl: upload.uploadUrl,
+            mimeType
+          });
+
+          return {
+            uri: upload.publicUrl,
+            mediaType: item.mediaType
+          };
+        })
+      );
+
+      return request<HypePost>("/api/v1/social/posts", {
+        method: "POST",
+        body: JSON.stringify({
+          caption: payload.caption,
+          media: uploadedMedia
+        })
+      });
+    } catch (error) {
+      appLogger.error(
+        "Failed to upload media or create post",
+        {
+          file: "src/modules/hype/api/hypeApi.ts",
+          location: "hypeApi.createPost",
+          action: "upload media and create post",
+          details: {
+            mediaCount: payload.media.length
+          }
+        },
+        error
+      );
+
+      throw error;
+    }
   },
 
   async toggleHype(postId: string): Promise<ToggleHypeResult> {

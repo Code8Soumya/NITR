@@ -1,9 +1,13 @@
+import { type AllowedMediaAspectRatioLabel } from "@/modules/hype/utils/mediaAspectRatio";
+
 export type HypeMediaType = "image" | "video";
 
 export type HypeMedia = {
   id: string;
   uri: string;
   mediaType: HypeMediaType;
+  aspectRatio?: number;
+  aspectRatioLabel?: AllowedMediaAspectRatioLabel;
 };
 
 export type HypeComment = {
@@ -20,6 +24,7 @@ export type HypePost = {
   userId: string;
   authorName: string;
   authorBranch: string;
+  authorBio?: string;
   caption: string;
   hashtags: string[];
   createdAt: string;
@@ -38,6 +43,9 @@ export type CreatePostPayload = {
   media: {
     uri: string;
     mediaType: HypeMediaType;
+    fileName?: string;
+    mimeType?: string;
+    aspectRatioLabel?: AllowedMediaAspectRatioLabel;
   }[];
 };
 

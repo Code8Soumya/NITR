@@ -7,7 +7,7 @@ Production backend for NITR HUB Tab-1 using AWS Lambda + API Gateway + Aurora Po
 - Feed listing with cursor pagination and optional hashtag filter
 - Post creation with hashtag extraction and media attachment metadata
 - Hype toggle (like/unlike)
-- Comment creation
+- Comment creation with one-comment-per-user-per-post upsert behavior
 - Trending hashtag aggregation
 - S3 pre-signed upload URL generation for image/video media
 - Auth module with NITR email registration/login, JWT access + refresh sessions
@@ -37,6 +37,7 @@ backend/tab1-social/
 |  '- 002_auth_and_admin.sql     # Auth users + refresh sessions + approvals
 |  '- 003_auth_cognito_otp.sql   # Cognito OTP fields + email verification columns
 |  '- 004_auth_profile_fields.sql # nickname/name/birthdate/gender/bio/interests fields
+|  '- 005_comments_one_per_user.sql # Deduplicate and enforce one comment per user per post
 |- scripts/
 |  '- runMigration.js            # Migration runner
 '- docs/
@@ -98,16 +99,16 @@ Create Lambda environment variables from `.env.example`:
 
 - `DATABASE_URL`: Aurora PostgreSQL connection string
 - `PG_SSL`: `true` for Aurora in VPC
-- `PG_CONNECT_TIMEOUT_MS`: pg connection timeout in milliseconds (default `15000`)
+- `PG_CONNECT_TIMEOUT_MS`: pg connection timeout in milliseconds (default `5000`; keep lower than Lambda timeout)
 - `AWS_REGION`: e.g. `ap-south-1`
 - `SOCIAL_MEDIA_BUCKET`: S3 bucket name for tab-1 media
 - `SOCIAL_MEDIA_PUBLIC_BASE_URL`: CloudFront URL (recommended)
+- `SOCIAL_MEDIA_READ_URL_EXPIRES_IN`: signed media-read URL TTL in seconds (default `3600`, max `86400`)
 - `CORS_ALLOW_ORIGIN`: allowed app origin (`*` for development)
 - `EXPOSE_INTERNAL_ERRORS`: `true` only for temporary debugging (returns raw unexpected error messages)
 - `DEFAULT_FEED_LIMIT`: default pagination size
 - `MAX_FEED_LIMIT`: hard page-size cap
 - `ENABLE_DEV_HEADERS`: `true` only while auth is not yet wired in app
-- `ADMIN_EMAIL`: the only email that receives admin privileges during registration
 - `ACCESS_TOKEN_SECRET`: HMAC secret for access token signing
 - `REFRESH_TOKEN_SECRET`: HMAC secret for refresh token signing
 - `ACCESS_TOKEN_TTL`: access token lifetime (e.g. `15m`)
@@ -115,8 +116,14 @@ Create Lambda environment variables from `.env.example`:
 - `BCRYPT_ROUNDS`: password hashing cost factor (default `12`)
 - `COGNITO_OTP_ENABLED`: `true` to enforce Cognito OTP verification at registration
 - `COGNITO_REGION`: region for Cognito user pool
+- `COGNITO_MAX_ATTEMPTS`: Cognito SDK retry attempts (default `2`; lower this if Lambda timeout is tight)
+- `COGNITO_USER_POOL_ID`: required for syncing profile updates (`name`, `nickname`) to Cognito
 - `COGNITO_USER_POOL_CLIENT_ID`: Cognito app client id
 - `COGNITO_USER_POOL_CLIENT_SECRET`: optional app client secret (required only if client is secret-enabled)
+
+When Lambda runs in private subnets and `COGNITO_OTP_ENABLED=true`, ensure outbound HTTPS access to Cognito (`cognito-idp`) via NAT or a VPC interface endpoint.
+
+If register returns `COGNITO_PRIVATELINK_DISABLED` (or Cognito message `PrivateLink access is disabled for the user pool that has ManagedLogin configured`), either enable PrivateLink access for that user pool or route Lambda to public Cognito endpoints via NAT.
 
 ## Local Setup
 
@@ -159,10 +166,13 @@ If `EXPO_PUBLIC_SOCIAL_API_BASE_URL` is not set, frontend falls back to the prev
 ## Auth + Approval Behavior
 
 - All non-admin registrations start in `pending` state.
+- Only `122me0914@nitrkl.ac.in` bypasses admin approval and is auto-marked as admin.
 - Registration now requires `name`, `nickname`, `birthDate`, and `gender`.
 - `nickname` is used as the in-app username.
 - When `COGNITO_OTP_ENABLED=true`, registration returns an OTP challenge and user must confirm OTP before login.
-- `bio` and `interests` can be sent during registration and later edited through `PUT /api/v1/auth/profile`.
+- When `COGNITO_OTP_ENABLED=true`, login first attempts Cognito password auth for account-state checks; if the app client does not enable `ALLOW_USER_PASSWORD_AUTH`, backend falls back to local bcrypt verification and logs a warning (`COGNITO_AUTH_FLOW_NOT_ENABLED`).
+- `PUT /api/v1/auth/profile` allows updates to `name`, `nickname`, `branch`, `bio`, and `interests`.
+- `email`, `birthDate`, and `gender` are immutable after registration.
+- When Cognito OTP is enabled, profile updates also sync `name` and `nickname` into Cognito.
 - Social endpoints require either admin role or `approved` status.
 - Rejected users cannot login.
-- The admin email defaults to `122ME0914@nitrkl.ac.in` and can be overridden by `ADMIN_EMAIL`.

@@ -2,8 +2,9 @@ import { Buffer } from "node:buffer";
 
 import { withTransaction } from "./db.js";
 import { HttpError } from "./errors.js";
-import { extractHashtags, normalizeHashtag } from "./hashtags.js";
+import { extractHashtags, normalizeHashtag, validateHashtagCount } from "./hashtags.js";
 import { logWarn } from "./logger.js";
+import { resolveMediaReadUrl } from "./media.js";
 
 const maxCaptionLength = 2000;
 const maxCommentLength = 1000;
@@ -101,12 +102,19 @@ const hydratePosts = async (client, baseRows) => {
     )
   ]);
 
+  const hydratedMediaRows = await Promise.all(
+    mediaResult.rows.map(async (row) => ({
+      ...row,
+      resolved_uri: await resolveMediaReadUrl({ uri: row.uri })
+    }))
+  );
+
   const mediaByPostId = new Map();
-  for (const row of mediaResult.rows) {
+  for (const row of hydratedMediaRows) {
     const existing = mediaByPostId.get(row.post_id) ?? [];
     existing.push({
       id: row.id,
-      uri: row.uri,
+      uri: row.resolved_uri,
       mediaType: row.media_type
     });
     mediaByPostId.set(row.post_id, existing);
@@ -126,19 +134,27 @@ const hydratePosts = async (client, baseRows) => {
     commentsByPostId.set(row.post_id, existing);
   }
 
-  return baseRows.map((row) => ({
-    id: row.id,
-    userId: row.author_user_id,
-    authorName: row.author_name,
-    authorBranch: row.author_branch,
-    caption: row.caption,
-    hashtags: hashtagsByPostId.get(row.id) ?? [],
-    createdAt: new Date(row.created_at).toISOString(),
-    hypeCount: Number(row.hype_count ?? 0),
-    isHypedByMe: Boolean(row.is_hyped_by_me),
-    media: mediaByPostId.get(row.id) ?? [],
-    comments: commentsByPostId.get(row.id) ?? []
-  }));
+  return baseRows.map((row) => {
+    const authorBio =
+      typeof row.author_bio === "string" && row.author_bio.trim().length
+        ? row.author_bio.trim()
+        : undefined;
+
+    return {
+      id: row.id,
+      userId: row.author_user_id,
+      authorName: row.author_name,
+      authorBranch: row.author_branch,
+      authorBio,
+      caption: row.caption,
+      hashtags: hashtagsByPostId.get(row.id) ?? [],
+      createdAt: new Date(row.created_at).toISOString(),
+      hypeCount: Number(row.hype_count ?? 0),
+      isHypedByMe: Boolean(row.is_hyped_by_me),
+      media: mediaByPostId.get(row.id) ?? [],
+      comments: commentsByPostId.get(row.id) ?? []
+    };
+  });
 };
 
 const fetchPostById = async (client, postId, currentUserId) => {
@@ -149,15 +165,17 @@ const fetchPostById = async (client, postId, currentUserId) => {
       p.author_user_id,
       p.author_name,
       p.author_branch,
+      NULLIF(btrim(au.bio), '') AS author_bio,
       p.caption,
       p.created_at,
       COUNT(ph.user_id)::int AS hype_count,
       COALESCE(BOOL_OR(ph.user_id = $1::text), false) AS is_hyped_by_me
     FROM social.posts p
+    LEFT JOIN auth.users au ON au.id::text = p.author_user_id
     LEFT JOIN social.post_hypes ph ON ph.post_id = p.id
     WHERE p.id = $2::uuid
       AND p.deleted_at IS NULL
-    GROUP BY p.id
+    GROUP BY p.id, au.bio
     `,
     [currentUserId ?? null, postId]
   );
@@ -218,11 +236,13 @@ export const listFeed = async ({
         p.author_user_id,
         p.author_name,
         p.author_branch,
+        NULLIF(btrim(au.bio), '') AS author_bio,
         p.caption,
         p.created_at,
         COUNT(ph.user_id)::int AS hype_count,
         COALESCE(BOOL_OR(ph.user_id = $1::text), false) AS is_hyped_by_me
       FROM social.posts p
+      LEFT JOIN auth.users au ON au.id::text = p.author_user_id
       LEFT JOIN social.post_hypes ph ON ph.post_id = p.id
       WHERE p.deleted_at IS NULL
         AND (
@@ -240,7 +260,7 @@ export const listFeed = async ({
           OR p.created_at < $3::timestamptz
           OR (p.created_at = $3::timestamptz AND p.id < $4::uuid)
         )
-      GROUP BY p.id
+      GROUP BY p.id, au.bio
       ORDER BY p.created_at DESC, p.id DESC
       LIMIT $5
       `,
@@ -304,6 +324,7 @@ export const createPost = async ({ user, caption, media }) => {
     const postId = createResult.rows[0]?.id;
 
     const hashtags = extractHashtags(sanitizedCaption);
+    validateHashtagCount(hashtags);
     await syncPostHashtags(client, postId, hashtags);
 
     if (Array.isArray(media) && media.length) {
@@ -382,7 +403,25 @@ export const addComment = async ({ postId, user, body }) => {
   return withTransaction(async (client) => {
     await ensurePostExists(client, postId);
 
-    const result = await client.query(
+    const updateResult = await client.query(
+      `
+      UPDATE social.comments
+      SET
+        display_name = $3,
+        body = $4,
+        updated_at = now()
+      WHERE post_id = $1
+        AND user_id = $2
+      RETURNING id, post_id, user_id, display_name, body, created_at
+      `,
+      [postId, user.id, user.name, sanitizedBody]
+    );
+
+    if (updateResult.rowCount) {
+      return mapComment(updateResult.rows[0]);
+    }
+
+    const insertResult = await client.query(
       `
       INSERT INTO social.comments (post_id, user_id, display_name, body)
       VALUES ($1, $2, $3, $4)
@@ -391,7 +430,7 @@ export const addComment = async ({ postId, user, body }) => {
       [postId, user.id, user.name, sanitizedBody]
     );
 
-    return mapComment(result.rows[0]);
+    return mapComment(insertResult.rows[0]);
   });
 };
 

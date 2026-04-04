@@ -201,8 +201,16 @@ export const handler = async (event) => {
 
       const user = await updateUserProfile({
         userId: authUser.id,
+        name: payload.name,
+        nickname: payload.nickname,
+        branch: payload.branch,
         bio: payload.bio,
-        interests: payload.interests
+        interests: payload.interests,
+        email: payload.email,
+        gender: payload.gender,
+        birthDate: payload.birthDate,
+        birthdate: payload.birthdate,
+        birth_date: payload.birth_date
       });
 
       return jsonResponse(200, { data: user });

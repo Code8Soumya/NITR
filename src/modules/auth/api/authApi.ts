@@ -79,48 +79,51 @@ async function request<T>(
     responseRequestId = parsed?.error?.requestId ?? null;
 
     if (!response.ok) {
+      const isGatewayGeneric500 =
+        response.status >= 500 &&
+        !parsed?.error?.message &&
+        /"message"\s*:\s*"Internal Server Error"/i.test(raw);
+
       const baseMessage =
         parsed?.error?.message ??
-        (raw
-          ? `Request failed (${response.status}): ${previewText(raw)}`
-          : `Request failed (${response.status})`);
+        (isGatewayGeneric500
+            ? `Request failed (${response.status}): upstream Lambda timeout/unhandled error.`
+            : null) ??
+          (raw
+            ? `Request failed (${response.status}): ${previewText(raw)}`
+            : `Request failed (${response.status})`);
 
-      const withCode = responseErrorCode ? `${responseErrorCode}: ${baseMessage}` : baseMessage;
-      const message = responseRequestId
-        ? `${withCode} [requestId: ${responseRequestId}]`
-        : withCode;
-
-      throw new Error(message);
-    }
+        // Removed prefixing responseErrorCode and requestId to message to keep UI errors clean.
+        // They are still logged in appLogger below in catch block.
+        throw Object.assign(new Error(baseMessage), { code: responseErrorCode, requestId: responseRequestId });
+      }
 
     if (!parsed || parsed.data === undefined) {
-      throw new Error(
-        raw
-          ? `Malformed API response (${response.status}): ${previewText(raw)}`
-          : "Malformed API response"
-      );
+      throw new Error(`Request failed (${response.status}): invalid JSON envelope`);
     }
 
     return parsed.data;
   } catch (error) {
-    appLogger.error(
-      "Auth API request failed",
-      {
-        file: "src/modules/auth/api/authApi.ts",
-        location: "request",
-        action: `${method} ${path}`,
-        details: {
-          method,
-          path,
-          hasBearerToken: Boolean(token),
-          responseStatus,
-          responsePreview,
-          responseErrorCode,
-          responseRequestId
-        }
-      },
-      error
-    );
+    const logContext = {
+      file: "src/modules/auth/api/authApi.ts",
+      location: "request",
+      action: `${method} ${path}`,
+      details: {
+        method,
+        path,
+        hasBearerToken: Boolean(token),
+        responseStatus,
+        responsePreview,
+        responseErrorCode,
+        responseRequestId
+      }
+    };
+
+    if (responseStatus !== null && responseStatus >= 400 && responseStatus < 500) {
+      appLogger.warn("Auth API request failed", logContext, error);
+    } else {
+      appLogger.error("Auth API request failed", logContext, error);
+    }
 
     throw error;
   }

@@ -1,9 +1,10 @@
 import { Link, useLocalSearchParams, useRouter } from "expo-router";
 import { useMemo, useState } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { authApi } from "@/modules/auth/api/authApi";
+import { AnimatedPressable } from "@/shared/components/AnimatedPressable";
 import { appLogger } from "@/shared/utils/logger";
 
 export function VerifyOtpScreen() {
@@ -124,25 +125,23 @@ export function VerifyOtpScreen() {
         {info ? <Text className="text-sm text-emerald-700">{info}</Text> : null}
         {error ? <Text className="text-sm text-red-700">{error}</Text> : null}
 
-        <Pressable
+        <AnimatedPressable
           disabled={busy}
           onPress={verifyOtp}
           className="rounded-2xl bg-rose-600 px-4 py-3"
-          style={({ pressed }) => ({ opacity: pressed || busy ? 0.85 : 1 })}
         >
           <Text className="text-center text-base font-bold text-white">
             {busy ? "Verifying..." : "Verify OTP"}
           </Text>
-        </Pressable>
+        </AnimatedPressable>
 
-        <Pressable
+        <AnimatedPressable
           disabled={busy}
           onPress={resendOtp}
           className="rounded-2xl border border-stone-300 bg-white px-4 py-3"
-          style={({ pressed }) => ({ opacity: pressed || busy ? 0.85 : 1 })}
         >
           <Text className="text-center text-base font-semibold text-stone-700">Resend OTP</Text>
-        </Pressable>
+        </AnimatedPressable>
       </View>
 
       <View className="mt-5 flex-row justify-center gap-2">

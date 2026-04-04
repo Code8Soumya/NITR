@@ -15,6 +15,17 @@ type SerializedError = {
   cause?: unknown;
 };
 
+type LogPayload = {
+  timestamp: string;
+  level: LogLevel;
+  message: string;
+  file: string;
+  location: string;
+  action?: string;
+  details?: Record<string, unknown>;
+  error?: SerializedError;
+};
+
 const LOG_PREFIX = "[NITR-HUB]";
 
 const serializeError = (error: unknown): SerializedError => {
@@ -39,8 +50,31 @@ const serializeError = (error: unknown): SerializedError => {
   };
 };
 
+const buildPrimaryLine = (payload: LogPayload) => {
+  const parts = [
+    LOG_PREFIX,
+    payload.level.toUpperCase(),
+    payload.message,
+    `${payload.file}:${payload.location}`
+  ];
+
+  if (payload.action) {
+    parts.push(payload.action);
+  }
+
+  if (payload.error?.code !== undefined && payload.error?.code !== null) {
+    parts.push(`code=${String(payload.error.code)}`);
+  }
+
+  if (payload.error?.message) {
+    parts.push(payload.error.message);
+  }
+
+  return parts.join(" | ");
+};
+
 const emit = (level: LogLevel, message: string, context: LogContext, error?: unknown) => {
-  const payload = {
+  const payload: LogPayload = {
     timestamp: new Date().toISOString(),
     level,
     message,
@@ -50,18 +84,19 @@ const emit = (level: LogLevel, message: string, context: LogContext, error?: unk
     details: context.details,
     error: error === undefined ? undefined : serializeError(error)
   };
+  const primaryLine = buildPrimaryLine(payload);
 
   if (level === "error") {
-    console.error(LOG_PREFIX, payload);
+    console.error(primaryLine, payload);
     return;
   }
 
   if (level === "warn") {
-    console.warn(LOG_PREFIX, payload);
+    console.warn(primaryLine, payload);
     return;
   }
 
-  console.log(LOG_PREFIX, payload);
+  console.log(primaryLine, payload);
 };
 
 export const appLogger = {

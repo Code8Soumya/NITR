@@ -27,6 +27,7 @@ Failure:
   "userId": "string",
   "authorName": "string",
   "authorBranch": "string",
+  "authorBio": "string (optional)",
   "caption": "string",
   "hashtags": ["#tag"],
   "createdAt": "2026-03-29T09:00:00.000Z",
@@ -81,7 +82,10 @@ Failure:
   ]
 }
 ```
-*Note: `media` array is mandatory and must contain at least one item.*
+*Validation notes:*
+- `media` array is mandatory and must contain at least one item.
+- Caption supports at most 5 unique hashtags; otherwise API returns `HASHTAG_LIMIT_EXCEEDED`.
+- Frontend upload policy supports media ratios `9:16`, `16:9`, `3:4`, `4:3`, `1:1`, `4:5`.
 
 4. `POST /api/v1/social/posts/{postId}/hypes`
 - Body: none
@@ -103,6 +107,8 @@ Failure:
 ```json
 { "body": "string" }
 ```
+
+*Note: each user can keep only one comment per post; posting again updates the previous comment.*
 
 6. `GET /api/v1/social/hashtags/trending`
 - Query: `limit` (1-20)
@@ -286,11 +292,15 @@ Failure:
 
 ```json
 {
+  "name": "Updated full name",
+  "nickname": "updated_nick",
+  "branch": "ECE",
   "bio": "Updated bio",
   "interests": ["music", "photography", "coding"]
 }
 ```
 
+- Immutable fields: `email`, `birthDate`, and `gender` cannot be changed after registration.
 - Returns `data` with updated user profile.
 
 14. `GET /api/v1/auth/me`

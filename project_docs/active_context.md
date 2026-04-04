@@ -1,28 +1,229 @@
 # Active Context
 
-**Last Updated**: 2026-03-30
+**Last Updated**: 2026-03-31
 
 This document tracks the current task, recent changes, known bugs, and next steps. Update this file whenever you complete a feature, pivot tasks, or discover persistent issues.
 
 ## Current Task
 
-**Status**: [DONE] Tab-1 full backend implementation (code + frontend wiring + AWS setup docs)
+**Status**: [DONE] Tab-1 media-fit + ratio/crop + hashtag-limit hardening
 
-**Objective**: Implement complete backend for Tab-1 (Hype Feed) and connect frontend data layer to production endpoints.
+**Objective**: Fix remaining video rendering/control issues in Hype feed, expand supported media ratios, add photo crop-to-ratio flow, remove bottom hashtag text from post cards, and enforce max 5 hashtags per post.
 
 **Progress**:
 
-- [x] Created backend package `backend/tab1-social/` with Node 20 Lambda entrypoint
-- [x] Implemented REST routes for feed/posts/hypes/comments/trending hashtags/media upload-url
-- [x] Added PostgreSQL repository layer with transaction wrappers and server-side validation
-- [x] Added SQL migration (`sql/001_tab1_social.sql`) for social tables, indexes, and update triggers
-- [x] Added S3 pre-signed upload URL generation with CloudFront-ready public URL output
-- [x] Added auth user extraction from Cognito claims with temporary dev header fallback
-- [x] Replaced Tab-1 frontend `hypeApi.ts` with HTTP client for `/api/v1/social/*`
-- [x] Updated store mutation handling for backend mutation responses (`toggleHype`, `addComment`)
-- [x] Added deployment/setup docs for AWS Console and endpoint contracts
+- [x] Expanded allowed media ratios to include `3:4` and `4:3` in shared ratio utility
+- [x] Added photo crop-window ratio selector in `CreatePostScreen` and separated photo/video picker flows
+- [x] Updated `PostCard` media rendering to contain-fit visuals, reliable autoplay-muted behavior, and stable pause/mute controls
+- [x] Removed post-bottom hashtag text rendering in card UI while keeping caption preview
+- [x] Enforced max 5 unique hashtags in frontend create validation and backend `createPost` validation
+- [x] Updated API contract and memory-bank docs for new behavior
 
 ## Recent Changes
+
+### 2026-03-31
+
+- **Fixed Tab-1 media rendering and input constraints after UX bug report**
+  - Requirement covered:
+    - videos and photos should render properly and fit screen better
+    - add `3:4` and `4:3` support
+    - photo-only crop window for selected target ratio
+    - fix play/mute button bugs
+    - remove bottom red hashtag text from posts
+    - enforce max 5 hashtags per post
+  - Frontend changes:
+    - updated `src/modules/hype/utils/mediaAspectRatio.ts` allowed labels to `9:16`, `16:9`, `3:4`, `4:3`, `1:1`, `4:5` and added crop-dimension helper.
+    - refactored `src/modules/hype/screens/CreatePostScreen.tsx` into separate photo/video pickers; photos now open crop UI with selectable allowed ratio.
+    - added client-side hashtag cap (`5`) in `CreatePostScreen` and `src/modules/hype/api/hypeApi.ts`.
+    - updated `src/modules/hype/components/PostCard.tsx` to contain-fit media, improved autoplay/mute/pause control logic, and removed bottom hashtag text rendering.
+    - tuned feed layout/viewability thresholds in `src/modules/hype/screens/HypeFeedScreen.tsx` and aligned detail spacing in `src/modules/hype/screens/PostDetailScreen.tsx`.
+    - replaced mock video URI in `src/modules/hype/constants/mockFeed.ts` with a playable sample clip.
+  - Backend changes:
+    - added hashtag limit validator in `backend/tab1-social/src/lib/hashtags.js` (`MAX_HASHTAGS_PER_POST=5`).
+    - enforced hashtag cap in `backend/tab1-social/src/lib/socialRepository.js` during `createPost`.
+  - Contract/docs changes:
+    - updated `backend/tab1-social/docs/api-contract.md` to document hashtag cap and expanded frontend ratio policy.
+    - updated memory-bank docs (`project_docs/architecture.md`, `project_docs/file_index.md`, `project_docs/active_context.md`).
+  - Validation:
+    - frontend: `npm run typecheck` passes.
+    - backend: `cd backend/tab1-social; npm run check` passes.
+    - diagnostics: no errors in touched files.
+  - Status: [DONE]
+
+- **Enabled real profile bio in Tab-1 feed/post responses**
+  - Requirement covered:
+    - UI should show real profile bio from backend, not only a frontend fallback.
+  - Backend changes:
+    - updated `backend/tab1-social/src/lib/socialRepository.js` `listFeed` and `fetchPostById` SQL to `LEFT JOIN auth.users` and hydrate `author_bio` from `auth.users.bio`.
+    - updated post mapping to emit `authorBio` when a non-empty profile bio exists.
+  - Contract/docs changes:
+    - updated `backend/tab1-social/docs/api-contract.md` feed item shape with optional `authorBio`.
+    - updated memory-bank docs (`project_docs/architecture.md`, `project_docs/file_index.md`, `project_docs/active_context.md`).
+  - Validation:
+    - backend: `cd backend/tab1-social; npm run check` passes.
+    - frontend: `npm run typecheck` passes.
+  - Status: [DONE]
+
+- **Implemented Tab-1 frontend media ratio restrictions + video UX controls**
+  - Requirement covered:
+    - users can upload only `9:16`, `16:9`, `1:1`, `4:5` photo/video assets from gallery.
+    - feed/detail cards now render both image and video media using aspect-ratio-aware containers.
+    - videos autoplay muted when post cards enter viewport and include mute/pause controls.
+    - card top metadata now includes `authorName`, `authorBranch`, short `authorBio`; caption preview is intentionally truncated.
+  - Frontend changes:
+    - added `src/modules/hype/utils/mediaAspectRatio.ts` with allowed-ratio matching and normalization helpers.
+    - updated `src/modules/hype/screens/CreatePostScreen.tsx` to validate picked media dimensions before submit.
+    - updated `src/modules/hype/components/PostCard.tsx` for video playback (`expo-av`), in-view autoplay, and controls.
+    - updated `src/modules/hype/screens/HypeFeedScreen.tsx` with `FlatList` viewability tracking to drive autoplay visibility.
+    - updated `src/modules/hype/types.ts`, `src/modules/hype/api/hypeApi.ts`, and `src/modules/hype/constants/mockFeed.ts` for optional author bio and ratio metadata.
+    - installed `expo-av` in root `package.json`.
+  - Validation:
+    - frontend: `npm run typecheck` passes.
+  - Status: [DONE]
+
+- **Hardened immutable-profile-field enforcement at route boundary**
+  - Symptom: `PUT /api/v1/auth/profile` could silently ignore immutable keys (`email`, `gender`, `birthDate`) because handler payload mapping dropped those fields before repository validation.
+  - Fix:
+    - updated `backend/tab1-social/src/handler.js` to forward immutable keys (`email`, `gender`, `birthDate`, `birthdate`, `birth_date`) into profile-update input.
+    - updated `backend/tab1-social/src/lib/authRepository.js` `updateUserProfile` argument forwarding so `validateProfilePatchInput` can explicitly reject immutable-field update attempts with `IMMUTABLE_PROFILE_FIELD`.
+  - Validation:
+    - backend: `cd backend/tab1-social; npm run check` passes.
+    - frontend: `npm run typecheck` passes.
+  - Status: [DONE]
+
+- **Implemented approval exception + immutable profile fields + Cognito sync + calendar/animation UX**
+  - Requirement covered:
+    - admin approval now applies to all users except `122me0914@nitrkl.ac.in`.
+    - profile updates now allow `name`, `nickname`, `branch`, `bio`, `interests` for both users and admins.
+    - `email`, `birthDate`, and `gender` are blocked from profile edits.
+    - registration birthdate selection now uses calendar picker to prevent malformed date text.
+    - button press animations and animated update feedback added for improved UX.
+  - Backend changes:
+    - updated `backend/tab1-social/src/lib/authRepository.js` profile patch validation and update flow.
+    - updated `backend/tab1-social/src/lib/cognitoOtp.js` with `updateCognitoProfile` (`AdminUpdateUserAttributes`).
+    - updated `backend/tab1-social/src/handler.js` profile route payload mapping.
+    - added migration `backend/tab1-social/sql/006_admin_bypass_and_auth_profile_sync.sql`.
+    - updated backend docs/env templates for `COGNITO_USER_POOL_ID` and removed `ADMIN_EMAIL` dependency.
+  - Frontend changes:
+    - installed `@react-native-community/datetimepicker`.
+    - updated `RegisterScreen` to calendar-only birthdate input.
+    - updated `ProfileScreen` to editable allowed fields + read-only immutable fields + animated update feedback.
+    - added reusable `src/shared/components/AnimatedPressable.tsx` and applied it across auth/admin action buttons.
+  - Validation:
+    - frontend: `npm run typecheck` passes.
+    - backend: `cd backend/tab1-social; npm run check` passes.
+    - extra syntax checks: `node --check src/lib/authRepository.js` and `node --check src/lib/cognitoOtp.js` pass.
+  - Status: [DONE]
+
+- **Fixed Tab-1 photo visibility + one-comment-per-user behavior**
+  - Symptoms:
+    - Users reported uploaded photos were not visible in feed/detail cards.
+    - Users could post multiple comments on the same post instead of editing their prior one.
+  - Root causes:
+    - media URL handling assumed fully valid public URLs and did not recover when `SOCIAL_MEDIA_PUBLIC_BASE_URL` was misformatted (missing scheme) or when stored URLs required signed S3 read access.
+    - comment write path used plain inserts in `social.comments`, allowing duplicate comments per `(post_id, user_id)`.
+  - Fix:
+    - updated `backend/tab1-social/src/lib/media.js` to normalize public base URL (`https://` fallback) and added read-URL resolver for S3-backed media.
+    - updated `backend/tab1-social/src/lib/socialRepository.js` hydration to resolve media URLs per item and updated comments mutation to transaction-safe update-then-insert upsert logic.
+    - added migration `backend/tab1-social/sql/005_comments_one_per_user.sql` to deduplicate existing comment rows and enforce unique `(post_id, user_id)`.
+    - updated frontend store and detail composer (`src/modules/hype/store/hypeStore.ts`, `src/modules/hype/screens/PostDetailScreen.tsx`) so repeat comment submission replaces current user comment in UI state.
+    - hardened card media rendering (`src/modules/hype/components/PostCard.tsx`) with URI normalization and image-load fallback state.
+    - aligned mock behavior in `src/modules/hype/api/hypeApi.ts` so local mode also updates existing user comment.
+  - Validation:
+    - frontend typecheck: `npm run typecheck` passes.
+    - backend syntax check: `cd backend/tab1-social; npm run check` passes.
+    - VS Code diagnostics: no errors in changed frontend/backend source files.
+  - Status: [DONE]
+
+- **Fixed create-post flow to upload local photo/video files instead of manual URLs**
+  - Symptom: `CreatePostScreen` required users to paste media URLs, so students could not publish directly from gallery media.
+  - Root cause: frontend create-post UI and API payload wiring were still in legacy URL-input mode, despite backend support for `/api/v1/social/media/upload-url`.
+  - Fix:
+    - updated `src/modules/hype/screens/CreatePostScreen.tsx` to use `expo-image-picker` and let users pick one photo or video.
+    - updated `src/modules/hype/types.ts` to allow optional `fileName` and `mimeType` in create-post media payload items.
+    - updated `src/modules/hype/api/hypeApi.ts` create-post flow to request pre-signed upload URLs, upload binary media to S3 via `PUT`, then submit post with CDN/public URLs.
+    - installed `expo-image-picker` in frontend dependencies.
+  - Validation:
+    - Frontend typecheck (`npm run typecheck`): passes.
+  - Status: [DONE]
+
+- **Handled Cognito login failure: `USER_PASSWORD_AUTH flow not enabled for this client`**
+  - Symptom: Login for newly created users failed with backend `INVALID_COGNITO_PARAMETERS` and message `USER_PASSWORD_AUTH flow not enabled for this client` from `checkCognitoLogin`.
+  - Root cause: backend login check used Cognito `InitiateAuth` with `USER_PASSWORD_AUTH`, but the Cognito app client authentication-flow config did not include `ALLOW_USER_PASSWORD_AUTH`.
+  - Fix:
+    - updated `backend/tab1-social/src/lib/cognitoOtp.js` to map this case to explicit `COGNITO_AUTH_FLOW_NOT_ENABLED`.
+    - updated `backend/tab1-social/src/lib/authRepository.js` login flow to gracefully fall back to local bcrypt password verification when this specific app-client misconfiguration occurs.
+    - updated docs in `backend/tab1-social/README.md` and `backend/tab1-social/docs/aws-console-setup.md` with the exact Cognito app-client setting required.
+  - Validation:
+    - `npm run check` (backend package) passes.
+    - `node --check src/lib/cognitoOtp.js` and `node --check src/lib/authRepository.js` pass.
+  - Status: [DONE]
+
+- **Reduced noisy auth ERROR logs and improved runtime log readability**
+  - Symptom: Metro console showed repeated `ERROR [NITR-HUB]` call stacks during login failures without readable first-line context.
+  - Root cause:
+    - logger emitted prefix + object payload, and Metro often surfaced only the first token (`[NITR-HUB]`) in error output.
+    - expected auth 4xx failures (for example `USER_NOT_FOUND`, `INVALID_CREDENTIALS`) were logged as `error` in multiple layers.
+  - Fix:
+    - updated `src/shared/utils/logger.ts` to emit a contextual single-line message first (`level | message | file:location | action | code | error.message`).
+    - changed `src/modules/auth/api/authApi.ts` request catch to log 4xx responses as `warn`, keeping `error` for network/5xx failures.
+    - changed `src/modules/auth/store/authStore.ts` login catch to log expected auth failures as `warn`.
+    - removed duplicate screen-level error logging in `src/modules/auth/screens/LoginScreen.tsx` and preserved OTP redirect detection via `error.code`.
+  - Validation:
+    - VS Code diagnostics clean for touched files.
+    - Frontend typecheck (`npm run typecheck`): passes.
+  - Status: [DONE]
+
+- **Fixed Android bundling SyntaxError in LoginScreen JSX**
+  - Symptom: Metro/Babel failed with `Adjacent JSX elements must be wrapped in an enclosing tag` in `src/modules/auth/screens/LoginScreen.tsx` near line 63.
+  - Root cause: a prior bad edit placed JSX nodes inside `onSubmit` catch block, removing the component `return` boundary and breaking JSX tree parsing.
+  - Fix: restored valid `onSubmit` closure and rebuilt the screen `return` with a single `SafeAreaView` root containing header, form card, and register link row.
+  - Validation:
+    - VS Code diagnostics for `LoginScreen.tsx`: no errors.
+    - Full frontend typecheck (`tsc --noEmit`): passes.
+  - Status: [DONE]
+
+- **Fixed authApi TypeScript/syntax regressions discovered during login fix validation**
+  - Symptom: `npm run typecheck` failed in `src/modules/auth/api/authApi.ts` with parser/type errors.
+  - Root cause:
+    - missing closing brace in `if (!response.ok)` block of `request<T>` helper.
+    - unsafe return of `parsed.data` without null/undefined guard under strict typing.
+  - Fix:
+    - closed `if (!response.ok)` block before success return.
+    - added explicit success-envelope guard: throw if parsed JSON is null or `data` is undefined.
+  - Validation:
+    - VS Code diagnostics for `authApi.ts`: no errors.
+    - Full frontend typecheck (`tsc --noEmit`): passes.
+  - Status: [DONE]
+
+- **Fixed Android bundling SyntaxError in PendingApprovalScreen JSX**
+  - Symptom: Metro/Babel failed with `Unterminated JSX contents` in `src/modules/auth/screens/PendingApprovalScreen.tsx` near `</SafeAreaView>`.
+  - Root cause: missing closing `</Text>` for the approval/rejection message and missing outer card `</View>` caused invalid JSX tree.
+  - Fix: added both missing closing tags in `PendingApprovalScreen.tsx`.
+  - Validation:
+    - VS Code diagnostics for `PendingApprovalScreen.tsx`: no errors.
+  - Status: [DONE]
+
+- **Resolved register 400 diagnosis: Cognito PrivateLink disabled for Managed Login pool**
+  - CloudWatch now shows `InvalidParameterException`: `PrivateLink access is disabled for the user pool that has ManagedLogin configured` during `SignUp`.
+  - Backend now maps this to explicit:
+    - `COGNITO_PRIVATELINK_DISABLED`
+  - Fixed by completely disabling/removing the "Managed Login" setup (Cognito Domain) in the AWS Console for the User Pool. AWS PrivateLink (VPC Interface Endpoints) does not support User Pools that have Managed Login enabled.
+  - Validation:
+    - User confirmed the 400 error is resolved after disabling Managed Login.
+  - Status: [DONE]
+
+- **Resolved register 502 diagnosis: Cognito network timeout from Lambda private networking**
+  - CloudWatch showed `registerCognitoOtp` failing with `TimeoutError` / `ETIMEDOUT` while calling Cognito `SignUp`.
+  - Backend now maps Cognito network timeout/connectivity failures to explicit:
+    - `COGNITO_NETWORK_UNAVAILABLE`
+  - Added Cognito SDK retry tuning via env:
+    - `COGNITO_MAX_ATTEMPTS` (default `2`) to avoid long retry chains that can approach Lambda timeout.
+  - Updated deployment docs to require outbound Cognito path when OTP is enabled:
+    - NAT egress or interface endpoint `com.amazonaws.<region>.cognito-idp` for private-subnet Lambda.
+  - Validation:
+    - Backend `npm run check` passes.
+  - Status: [DONE]
 
 ### 2026-03-30
 
@@ -31,7 +232,9 @@ This document tracks the current task, recent changes, known bugs, and next step
   - This indicates infrastructure connectivity failure (Lambda VPC/subnet/SG path to Aurora) rather than request payload validation.
   - Added backend fallback mapping for timeout-message-only DB errors (no SQLSTATE code) to return:
     - `DB_UNAVAILABLE` with a targeted message for VPC/SG troubleshooting.
-  - Updated DB pool connect timeout to be env-configurable via `PG_CONNECT_TIMEOUT_MS` (default now `15000`) to avoid premature 5s connection cutoff during slow Aurora wake/connect phases.
+  - Updated DB pool connect timeout to be env-configurable via `PG_CONNECT_TIMEOUT_MS` with safer default `5000` so failures return before 15s Lambda timeout.
+  - Added deployment guidance to keep `PG_CONNECT_TIMEOUT_MS` lower than Lambda timeout; otherwise API Gateway returns generic timeout errors.
+  - Frontend auth API errors now add a specific hint when receiving API Gateway generic 500 body (`{"message":"Internal Server Error"}`), indicating likely Lambda timeout/unhandled upstream failure.
   - Validation:
     - Backend `npm run check` passes.
   - Status: [DONE]
@@ -289,7 +492,6 @@ This document tracks the current task, recent changes, known bugs, and next step
 
 ## Known Bugs
 
-- Create-post screen still accepts manual media URLs; upload picker + upload-url flow is not yet wired in UI.
 - Workspace reports TypeScript 6 warning in `tsconfig.json` about `baseUrl` deprecation (non-blocking existing warning).
 
 ## Next Steps

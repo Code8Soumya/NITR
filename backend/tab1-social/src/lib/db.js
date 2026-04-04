@@ -12,11 +12,11 @@ const buildPool = () => {
   }
 
   const sslEnabled = (process.env.PG_SSL ?? "true").toLowerCase() === "true";
-  const parsedConnectTimeoutMs = Number.parseInt(process.env.PG_CONNECT_TIMEOUT_MS ?? "15000", 10);
+  const parsedConnectTimeoutMs = Number.parseInt(process.env.PG_CONNECT_TIMEOUT_MS ?? "5000", 10);
   const connectTimeoutMs =
     Number.isFinite(parsedConnectTimeoutMs) && parsedConnectTimeoutMs > 0
       ? parsedConnectTimeoutMs
-      : 15000;
+      : 5000;
 
   return new Pool({
     connectionString,

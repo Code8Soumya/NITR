@@ -1,5 +1,6 @@
+import { useMemo, useRef, useState } from "react";
 import { useRouter } from "expo-router";
-import { FlatList, Pressable, RefreshControl, Text, View } from "react-native";
+import { FlatList, Pressable, RefreshControl, Text, View, type ViewToken } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { HashtagRail } from "@/modules/hype/components/HashtagRail";
@@ -11,6 +12,27 @@ import { useAuth } from "@/modules/auth/hooks/useAuth";
 export function HypeFeedScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const [visiblePostIds, setVisiblePostIds] = useState<string[]>([]);
+  const viewabilityConfig = useRef({
+    itemVisiblePercentThreshold: 50,
+    minimumViewTime: 80
+  });
+
+  const onViewableItemsChanged = useRef(
+    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
+      const nextVisibleIds = viewableItems
+        .map((entry) => {
+          const id = entry.item?.id;
+          return typeof id === "string" ? id : undefined;
+        })
+        .filter((id): id is string => Boolean(id));
+
+      setVisiblePostIds(nextVisibleIds);
+    }
+  );
+
+  const visiblePostIdSet = useMemo(() => new Set(visiblePostIds), [visiblePostIds]);
+
   const { setActiveHashtag, toggleHype } = useHypeActions();
   const {
     visiblePosts,
@@ -27,11 +49,13 @@ export function HypeFeedScreen() {
       <FlatList
         data={visiblePosts}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={{ padding: 16, paddingBottom: 28 }}
+        contentContainerStyle={{ paddingHorizontal: 10, paddingTop: 12, paddingBottom: 24 }}
+        onViewableItemsChanged={onViewableItemsChanged.current}
+        viewabilityConfig={viewabilityConfig.current}
         refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={refreshFeed} />}
         ListHeaderComponent={
           <View>
-            <View className="rounded-2xl bg-[#171717] p-5" style={{ elevation: 3 }}>
+            <View className="rounded-2xl bg-[#171717] p-4" style={{ elevation: 3 }}>
               <Text className="text-xs font-semibold uppercase tracking-[1.8px] text-rose-200">
                 Tab 1
               </Text>
@@ -73,6 +97,7 @@ export function HypeFeedScreen() {
             post={item}
             onToggleHype={() => void toggleHype(item.id)}
             onOpen={() => router.push(`/(tabs)/hype/${item.id}`)}
+            isVisible={visiblePostIdSet.has(item.id)}
           />
         )}
         ListEmptyComponent={

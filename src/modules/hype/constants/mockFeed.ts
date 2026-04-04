@@ -13,6 +13,7 @@ export const initialFeed: HypePost[] = [
     userId: "user-201",
     authorName: "Aarav N.",
     authorBranch: "ECE",
+    authorBio: "Sunsets, circuits, and late-night chai runs.",
     caption:
       "Sunset from SAC roof. NITR evenings are undefeated. #NITRLife #CampusMood #Sunset",
     hashtags: ["#NITRLife", "#CampusMood", "#Sunset"],
@@ -23,7 +24,8 @@ export const initialFeed: HypePost[] = [
       {
         id: "media-1",
         uri: "https://images.unsplash.com/photo-1470770841072-f978cf4d019e?w=1200",
-        mediaType: "image"
+        mediaType: "image",
+        aspectRatioLabel: "16:9"
       }
     ],
     comments: [
@@ -42,6 +44,7 @@ export const initialFeed: HypePost[] = [
     userId: "user-145",
     authorName: "Sarthak P.",
     authorBranch: "ME",
+    authorBio: "Building robots and shipping demos every week.",
     caption:
       "Robotics club sprint in progress. Demo tomorrow. #BuildInPublic #NITRTech",
     hashtags: ["#BuildInPublic", "#NITRTech"],
@@ -51,8 +54,9 @@ export const initialFeed: HypePost[] = [
     media: [
       {
         id: "media-2",
-        uri: "https://example.com/video-preview.mp4",
-        mediaType: "video"
+        uri: "https://samplelib.com/lib/preview/mp4/sample-5s.mp4",
+        mediaType: "video",
+        aspectRatioLabel: "16:9"
       }
     ],
     comments: []
@@ -62,6 +66,7 @@ export const initialFeed: HypePost[] = [
     userId: "user-300",
     authorName: "Prerna K.",
     authorBranch: "CSE",
+    authorBio: "Competitive coder, library regular, coffee loyalist.",
     caption: "Midsem prep grind check. Library seats filling fast. #ExamMode",
     hashtags: ["#ExamMode"],
     createdAt: minutesAgo(120),

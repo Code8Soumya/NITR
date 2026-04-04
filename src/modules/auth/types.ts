@@ -50,6 +50,9 @@ export type AuthRegisterInput = {
 };
 
 export type AuthProfileUpdateInput = {
+  name?: string;
+  nickname?: string;
+  branch?: string;
   bio?: string | null;
   interests?: string[];
 };

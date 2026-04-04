@@ -104,18 +104,30 @@ export const useAuthStore = create<AuthStoreState>((set, get) => ({
       await setSession(session);
       set({ user: session.user, tokens: session.tokens, busy: false });
     } catch (error) {
-      appLogger.error(
-        "Login failed",
-        {
-          file: "src/modules/auth/store/authStore.ts",
-          location: "useAuthStore.login",
-          action: "authenticate user",
-          details: {
-            email: input.email
-          }
-        },
-        error
-      );
+      const errorCode =
+        typeof (error as { code?: unknown } | null)?.code === "string"
+          ? ((error as { code?: string }).code ?? null)
+          : null;
+      const isExpectedAuthFailure =
+        errorCode === "USER_NOT_FOUND" ||
+        errorCode === "INVALID_CREDENTIALS" ||
+        errorCode === "OTP_VERIFICATION_REQUIRED";
+
+      const logContext = {
+        file: "src/modules/auth/store/authStore.ts",
+        location: "useAuthStore.login",
+        action: "authenticate user",
+        details: {
+          email: input.email,
+          errorCode
+        }
+      };
+
+      if (isExpectedAuthFailure) {
+        appLogger.warn("Login failed", logContext, error);
+      } else {
+        appLogger.error("Login failed", logContext, error);
+      }
 
       set({
         busy: false,
