@@ -49,6 +49,8 @@ export function RegisterScreen() {
   const [bio, setBio] = useState("");
   const [interestsText, setInterestsText] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [validationError, setValidationError] = useState("");
 
   const birthDate = useMemo(() => formatBirthDate(birthDateValue), [birthDateValue]);
 
@@ -107,6 +109,13 @@ export function RegisterScreen() {
 
   const onSubmit = async () => {
     clearError();
+    setValidationError("");
+
+    if (!name || !nickname || !birthDate || !gender || !branch || !email || !password) {
+      setValidationError("Please fill all required fields");
+      return;
+    }
+
     const interests = interestsText
       .split(",")
       .map((item) => item.trim())
@@ -153,12 +162,12 @@ export function RegisterScreen() {
         className="flex-1"
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
-        <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingVertical: 24, paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
-          <View className="mb-8 mt-6">
-            <Text className="text-3xl font-black text-stone-900">Create account</Text>
-            <Text className="mt-2 text-base text-stone-700">Only NIT Rourkela emails are accepted.</Text>
-          </View>
+        <View className="mb-4 mt-6 px-5 border-b border-amber-200/50 pb-4 bg-amber-50 z-10">
+          <Text className="text-3xl font-black text-stone-900">Create account</Text>
+          <Text className="mt-2 text-base text-stone-700">Only NIT Rourkela emails are accepted</Text>
+        </View>
 
+        <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingVertical: 10, paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
           <Animated.View
             className="gap-4 rounded-3xl border border-amber-200 bg-white p-5"
             style={{
@@ -174,10 +183,10 @@ export function RegisterScreen() {
             }}
           >
             <View>
-              <Text className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-600">Full name</Text>
+              <Text className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-600">Full name <Text className="text-red-500">*</Text></Text>
               <TextInput
                 onChangeText={setName}
-                placeholder="Your real name"
+                placeholder="your real name"
                 placeholderTextColor="#78716c"
                 value={name}
                 className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-base text-stone-900"
@@ -185,12 +194,12 @@ export function RegisterScreen() {
             </View>
 
             <View>
-              <Text className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-600">Nickname</Text>
+              <Text className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-600">Username <Text className="text-red-500">*</Text></Text>
               <TextInput
                 autoCapitalize="none"
                 autoCorrect={false}
                 onChangeText={setNickname}
-                placeholder="username_for_app"
+                placeholder="username for app"
                 placeholderTextColor="#78716c"
                 value={nickname}
                 className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-base text-stone-900"
@@ -198,13 +207,12 @@ export function RegisterScreen() {
             </View>
 
             <View>
-              <Text className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-600">Birth date</Text>
+              <Text className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-600">Birth date <Text className="text-red-500">*</Text></Text>
               <AnimatedPressable
                 onPress={openBirthDatePicker}
                 className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3"
               >
                 <Text className="text-base text-stone-900">{birthDate}</Text>
-                <Text className="mt-1 text-xs text-stone-500">Tap to pick from calendar</Text>
               </AnimatedPressable>
 
               {Platform.OS === "ios" && showIosDatePicker ? (
@@ -222,7 +230,7 @@ export function RegisterScreen() {
             </View>
 
             <View>
-              <Text className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-600">Gender</Text>
+              <Text className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-600">Gender <Text className="text-red-500">*</Text></Text>
               <View className="flex-row gap-2">
                 {genderOptions.map((option) => {
                   const active = gender === option;
@@ -242,7 +250,7 @@ export function RegisterScreen() {
             </View>
 
             <View>
-              <Text className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-600">Branch</Text>
+              <Text className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-600">Branch <Text className="text-red-500">*</Text></Text>
               <TextInput
                 onChangeText={setBranch}
                 placeholder="CSE"
@@ -280,7 +288,7 @@ export function RegisterScreen() {
             </View>
 
             <View>
-              <Text className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-600">Email</Text>
+              <Text className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-600">Email <Text className="text-red-500">*</Text></Text>
               <TextInput
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -294,17 +302,26 @@ export function RegisterScreen() {
             </View>
 
             <View>
-              <Text className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-600">Password</Text>
-              <TextInput
-                secureTextEntry
-                onChangeText={setPassword}
-                placeholder="Min 8 chars, include upper/lower + number"
-                placeholderTextColor="#78716c"
-                value={password}
-                className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-base text-stone-900"
-              />
+              <Text className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-600">Password <Text className="text-red-500">*</Text></Text>
+              <View className="relative justify-center">
+                <TextInput
+                  secureTextEntry={!showPassword}
+                  onChangeText={setPassword}
+                  placeholder="Min 8 chars, include upper/lower + num"
+                  placeholderTextColor="#78716c"
+                  value={password}
+                  className="rounded-2xl border border-amber-200 bg-amber-50 pl-4 pr-12 py-3 text-base text-stone-900"
+                />
+                <AnimatedPressable
+                  onPress={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 p-1"
+                >
+                  <Text className="text-xs font-bold text-stone-500">{showPassword ? "HIDE" : "SHOW"}</Text>
+                </AnimatedPressable>
+              </View>
             </View>
 
+            {validationError ? <Text className="text-sm text-red-700">{validationError}</Text> : null}
             {error ? <Text className="text-sm text-red-700">{error}</Text> : null}
 
             <AnimatedPressable

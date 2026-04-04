@@ -1,25 +1,117 @@
 # Active Context
 
-**Last Updated**: 2026-03-31
+**Last Updated**: 2026-04-04
 
 This document tracks the current task, recent changes, known bugs, and next steps. Update this file whenever you complete a feature, pivot tasks, or discover persistent issues.
 
 ## Current Task
 
-**Status**: [DONE] Tab-1 media-fit + ratio/crop + hashtag-limit hardening
+**Status**: [DONE] Fix profile delete-post 404 fallback
 
-**Objective**: Fix remaining video rendering/control issues in Hype feed, expand supported media ratios, add photo crop-to-ratio flow, remove bottom hashtag text from post cards, and enforce max 5 hashtags per post.
+**Objective**: Resolve `Request failed (404)` when deleting a post from profile page by handling API Gateway deployments where DELETE route wiring is missing.
 
 **Progress**:
 
-- [x] Expanded allowed media ratios to include `3:4` and `4:3` in shared ratio utility
-- [x] Added photo crop-window ratio selector in `CreatePostScreen` and separated photo/video picker flows
-- [x] Updated `PostCard` media rendering to contain-fit visuals, reliable autoplay-muted behavior, and stable pause/mute controls
-- [x] Removed post-bottom hashtag text rendering in card UI while keeping caption preview
-- [x] Enforced max 5 unique hashtags in frontend create validation and backend `createPost` validation
-- [x] Updated API contract and memory-bank docs for new behavior
+- [x] Added frontend delete fallback: try `DELETE /api/v1/social/posts/{postId}`, then fallback to `POST /api/v1/social/posts` with `{ action: "delete", postId }` on route-missing 404.
+- [x] Added backend compatibility handling in `POST /api/v1/social/posts` for `{ action: "delete", postId }`.
+- [x] Updated backend CORS allow-methods to include `DELETE`.
+- [x] Updated API contract/setup docs and memory-bank docs with delete-route requirements and compatibility behavior.
 
 ## Recent Changes
+
+### 2026-04-04
+
+- **Fixed profile delete-post 404 for API Gateway route mismatch**
+  - Requirement covered:
+    - deleting a post from profile should not fail with `Request failed (404)`.
+  - Root cause:
+    - frontend called `DELETE /api/v1/social/posts/{postId}` but many deployed API Gateway route lists did not include this DELETE route, producing plain 404 responses without repo error envelope.
+  - Frontend changes:
+    - updated `src/modules/hype/api/hypeApi.ts` delete flow to fallback to `POST /api/v1/social/posts` with `{ action: "delete", postId }` only when DELETE returns route-missing style 404.
+  - Backend changes:
+    - updated `backend/tab1-social/src/handler.js` `POST /api/v1/social/posts` route to support compatibility delete action while preserving existing create-post behavior.
+    - updated `backend/tab1-social/src/lib/http.js` CORS methods to include `DELETE`.
+  - Contract/docs changes:
+    - updated `backend/tab1-social/docs/api-contract.md`, `backend/tab1-social/docs/aws-console-setup.md`, and `backend/tab1-social/README.md` with delete route + compatibility fallback details.
+    - updated memory-bank docs (`project_docs/architecture.md`, `project_docs/file_index.md`, `project_docs/active_context.md`).
+  - Validation:
+    - frontend: `npm run typecheck` passes.
+    - backend: `cd backend/tab1-social; npm run check` passes.
+    - diagnostics: no errors in touched files.
+  - Status: [DONE]
+
+- **Implemented profile view/edit flow + backend profile-posts endpoint**
+  - Requirement covered:
+    - 3-dot menu should show Profile (not Edit Profile).
+    - Profile page should show user details and posts.
+    - Edit Profile should be opened from a button inside profile page.
+    - Backend should support profile-post retrieval endpoint.
+  - Frontend changes:
+    - updated `src/modules/hype/screens/HypeFeedScreen.tsx` overflow menu label to `Profile`.
+    - added `src/modules/auth/screens/ProfileViewScreen.tsx` for details/posts/sign-out/admin actions + edit CTA.
+    - updated `app/(tabs)/hype/profile.tsx` to render `ProfileViewScreen`.
+    - added route `app/(tabs)/hype/edit-profile.tsx` and hidden-tab registration in `app/(tabs)/_layout.tsx`.
+    - refactored `src/modules/auth/screens/ProfileScreen.tsx` into edit-only form screen.
+  - Backend changes:
+    - added `listUserPosts` in `backend/tab1-social/src/lib/socialRepository.js`.
+    - added `GET /api/v1/social/users/{userId}/posts` route handling in `backend/tab1-social/src/handler.js`.
+  - Contract/docs changes:
+    - updated `backend/tab1-social/docs/api-contract.md` and `backend/tab1-social/docs/aws-console-setup.md` with the new route.
+    - updated memory-bank docs (`project_docs/architecture.md`, `project_docs/file_index.md`, `project_docs/active_context.md`).
+  - Status: [DONE]
+
+- **Redesigned PostgreSQL Database Schema and Added Follows/Visibility**
+  - Requirement covered:
+    - Reset and optimize DB employing advanced PostgreSQL design patterns.
+    - Add user followers and following implementations.
+    - Add post visibility options (public, followers, connections).
+    - Ensure `birth_date` is a strictly required NOT NULL field.
+    - Document new design in `database_design.md` and enforce maintenance via copilot instructions.
+  - Backend changes:
+    - Deleted legacy migration files and consolidated schema into `backend/tab1-social/sql/001_setup.sql`.
+    - Added `social.follows` join table to track relationships efficiently.
+    - Added `visibility` ENUM (`public`, `followers`, `connections`) to `social.posts`.
+    - Normalized `social.posts` by dropping duplicated `author_name` and `author_branch`, fetching them via `JOIN auth.users` per request.
+    - Enforced `birth_date date NOT NULL` restriction in `auth.users` on the DB level.
+    - Updated `socialRepository.js` query logic in `listFeed` and `fetchPostById` to check `social.follows` dynamically against the post's `visibility`.
+    - Added `backend/tab1-social/sql/002_admin_setup.sql` migration to guarantee the hardcoded admin is seeded correctly.
+  - Contract/docs changes:
+    - Created `project_docs/database_design.md` to map tables, constraints, and relationships.
+    - Updated `.github/copilot-instructions.md` to make `database_design.md` a mandatory read and strictly maintained standard.
+  - Status: [DONE]
+
+- **Fixed create-post upload failure + added tab menu + 3-state video audio mode**
+  - Requirement covered:
+    - `CreatePost` should not fail with generic `Network request failed` during media upload
+    - remove image-picker deprecation warning for `MediaTypeOptions`
+    - add 3-dot overflow menu on top of every tab with Edit Profile + placeholder section
+    - add global Hype mute behavior with 3 states (red/yellow/green)
+  - Frontend changes:
+    - updated `src/modules/hype/api/hypeApi.ts` local media upload helper to read local blobs with `fetch` first and `XMLHttpRequest` blob fallback for Android URI compatibility.
+    - updated `src/modules/hype/screens/CreatePostScreen.tsx` picker options to `mediaTypes: ["images"]` / `mediaTypes: ["videos"]`.
+    - added global video audio mode state and cycling action in `src/modules/hype/store/hypeStore.ts` and hooks.
+    - updated `src/modules/hype/components/PostCard.tsx` to enforce mode rules: red = forced mute (unmute disabled), yellow = start muted with optional unmute, green = start unmuted.
+    - updated `src/modules/hype/screens/HypeFeedScreen.tsx` with top audio-mode toggle button and color-coded state labels.
+    - updated `src/modules/hype/screens/PostDetailScreen.tsx` to apply the same global audio mode.
+    - updated `app/(tabs)/_layout.tsx` with shared 3-dot header menu and profile shortcut.
+  - Validation:
+    - frontend: `npm run typecheck` passes.
+    - diagnostics: no errors in touched files.
+  - Status: [DONE]
+
+- **Migrated Tab-1 video playback to expo-video and fixed rendering issues**
+  - Requirement covered:
+    - remove deprecation warning from `expo-av` Video component
+    - fix videos not rendering/clipping properly in feed and create-post preview
+  - Frontend changes:
+    - updated `src/modules/hype/components/PostCard.tsx` to use `expo-video` (`useVideoPlayer` + `VideoView`) and replaced async ref-control calls with direct player `play()/pause()` and `muted` property updates.
+    - updated `src/modules/hype/screens/CreatePostScreen.tsx` selected video preview from `expo-av` `Video` to `expo-video` `VideoView`.
+    - set `surfaceType="textureView"` and `contentFit="contain"` for improved Android rendering in rounded/overflow-hidden containers.
+    - replaced dependency in root `package.json` from `expo-av` to `expo-video`.
+  - Validation:
+    - frontend: `npm run typecheck` passes.
+    - diagnostics: no errors in touched files.
+  - Status: [DONE]
 
 ### 2026-03-31
 

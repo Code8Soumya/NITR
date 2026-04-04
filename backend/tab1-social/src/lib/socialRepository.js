@@ -93,10 +93,11 @@ const hydratePosts = async (client, baseRows) => {
     ),
     client.query(
       `
-      SELECT id, post_id, user_id, display_name, body, created_at
-      FROM social.comments
-      WHERE post_id = ANY($1::uuid[])
-      ORDER BY created_at ASC
+      SELECT c.id, c.post_id, c.user_id, au.display_name, c.body, c.created_at
+      FROM social.comments c
+      JOIN auth.users au ON au.id = c.user_id
+      WHERE c.post_id = ANY($1::uuid[])
+      ORDER BY c.created_at ASC
       `,
       [postIds]
     )
@@ -147,6 +148,7 @@ const hydratePosts = async (client, baseRows) => {
       authorBranch: row.author_branch,
       authorBio,
       caption: row.caption,
+      visibility: row.visibility,
       hashtags: hashtagsByPostId.get(row.id) ?? [],
       createdAt: new Date(row.created_at).toISOString(),
       hypeCount: Number(row.hype_count ?? 0),
@@ -162,20 +164,21 @@ const fetchPostById = async (client, postId, currentUserId) => {
     `
     SELECT
       p.id,
-      p.author_user_id,
-      p.author_name,
-      p.author_branch,
+      p.author_id AS author_user_id,
+      COALESCE(au.full_name, au.display_name) AS author_name,
+      au.branch AS author_branch,
       NULLIF(btrim(au.bio), '') AS author_bio,
       p.caption,
+      p.visibility,
       p.created_at,
       COUNT(ph.user_id)::int AS hype_count,
-      COALESCE(BOOL_OR(ph.user_id = $1::text), false) AS is_hyped_by_me
+      COALESCE(BOOL_OR(ph.user_id = $1::uuid), false) AS is_hyped_by_me
     FROM social.posts p
-    LEFT JOIN auth.users au ON au.id::text = p.author_user_id
+    JOIN auth.users au ON au.id = p.author_id
     LEFT JOIN social.post_hypes ph ON ph.post_id = p.id
     WHERE p.id = $2::uuid
       AND p.deleted_at IS NULL
-    GROUP BY p.id, au.bio
+    GROUP BY p.id, au.id
     `,
     [currentUserId ?? null, postId]
   );
@@ -233,18 +236,28 @@ export const listFeed = async ({
       `
       SELECT
         p.id,
-        p.author_user_id,
-        p.author_name,
-        p.author_branch,
+        p.author_id AS author_user_id,
+        COALESCE(au.full_name, au.display_name) AS author_name,
+        au.branch AS author_branch,
         NULLIF(btrim(au.bio), '') AS author_bio,
         p.caption,
+        p.visibility,
         p.created_at,
         COUNT(ph.user_id)::int AS hype_count,
-        COALESCE(BOOL_OR(ph.user_id = $1::text), false) AS is_hyped_by_me
+        COALESCE(BOOL_OR(ph.user_id = $1::uuid), false) AS is_hyped_by_me
       FROM social.posts p
-      LEFT JOIN auth.users au ON au.id::text = p.author_user_id
+      JOIN auth.users au ON au.id = p.author_id
       LEFT JOIN social.post_hypes ph ON ph.post_id = p.id
       WHERE p.deleted_at IS NULL
+        AND (
+          p.visibility = 'public'
+          OR p.author_id = $1::uuid
+          OR (p.visibility = 'followers' AND EXISTS (SELECT 1 FROM social.follows f WHERE f.following_id = p.author_id AND f.follower_id = $1::uuid))
+          OR (p.visibility = 'connections' AND (
+                EXISTS (SELECT 1 FROM social.follows f WHERE f.following_id = p.author_id AND f.follower_id = $1::uuid)
+                OR EXISTS (SELECT 1 FROM social.follows f WHERE f.follower_id = p.author_id AND f.following_id = $1::uuid)
+             ))
+        )
         AND (
           $2::text IS NULL
           OR EXISTS (
@@ -260,7 +273,7 @@ export const listFeed = async ({
           OR p.created_at < $3::timestamptz
           OR (p.created_at = $3::timestamptz AND p.id < $4::uuid)
         )
-      GROUP BY p.id, au.bio
+      GROUP BY p.id, au.id
       ORDER BY p.created_at DESC, p.id DESC
       LIMIT $5
       `,
@@ -293,11 +306,125 @@ export const listFeed = async ({
   });
 };
 
+export const listUserPosts = async ({
+  currentUserId,
+  profileUserId,
+  cursor,
+  limit,
+  maxLimit
+}) => {
+  const boundedLimit = Math.min(Math.max(limit, 1), maxLimit);
+  const decodedCursor = decodeCursor(cursor);
+
+  return withTransaction(async (client) => {
+    const result = await client.query(
+      `
+      SELECT
+        p.id,
+        p.author_id AS author_user_id,
+        COALESCE(au.full_name, au.display_name) AS author_name,
+        au.branch AS author_branch,
+        NULLIF(btrim(au.bio), '') AS author_bio,
+        p.caption,
+        p.visibility,
+        p.created_at,
+        COUNT(ph.user_id)::int AS hype_count,
+        COALESCE(BOOL_OR(ph.user_id = $1::uuid), false) AS is_hyped_by_me
+      FROM social.posts p
+      JOIN auth.users au ON au.id = p.author_id
+      LEFT JOIN social.post_hypes ph ON ph.post_id = p.id
+      WHERE p.deleted_at IS NULL
+        AND p.author_id = $2::uuid
+        AND (
+          p.author_id = $1::uuid
+          OR p.visibility = 'public'
+          OR (
+            p.visibility = 'followers'
+            AND EXISTS (
+              SELECT 1
+              FROM social.follows f
+              WHERE f.following_id = p.author_id
+                AND f.follower_id = $1::uuid
+            )
+          )
+          OR (
+            p.visibility = 'connections'
+            AND (
+              EXISTS (
+                SELECT 1
+                FROM social.follows f
+                WHERE f.following_id = p.author_id
+                  AND f.follower_id = $1::uuid
+              )
+              OR EXISTS (
+                SELECT 1
+                FROM social.follows f
+                WHERE f.follower_id = p.author_id
+                  AND f.following_id = $1::uuid
+              )
+            )
+          )
+        )
+        AND (
+          $3::timestamptz IS NULL
+          OR p.created_at < $3::timestamptz
+          OR (p.created_at = $3::timestamptz AND p.id < $4::uuid)
+        )
+      GROUP BY p.id, au.id
+      ORDER BY p.created_at DESC, p.id DESC
+      LIMIT $5
+      `,
+      [
+        currentUserId,
+        profileUserId,
+        decodedCursor.createdAt,
+        decodedCursor.id,
+        boundedLimit + 1
+      ]
+    );
+
+    const hasMore = result.rows.length > boundedLimit;
+    const pageRows = hasMore ? result.rows.slice(0, boundedLimit) : result.rows;
+    const items = await hydratePosts(client, pageRows);
+
+    const lastRow = pageRows[pageRows.length - 1];
+    const nextCursor =
+      hasMore && lastRow
+        ? encodeCursor({
+            createdAt: new Date(lastRow.created_at).toISOString(),
+            id: lastRow.id
+          })
+        : undefined;
+
+    return {
+      items,
+      nextCursor
+    };
+  });
+};
+
 export const getPostById = async ({ postId, userId }) =>
   withTransaction((client) => fetchPostById(client, postId, userId));
 
-export const createPost = async ({ user, caption, media }) => {
+export const deletePost = async ({ postId, userId }) => {
+  return withTransaction(async (client) => {
+    const checkResult = await client.query(
+      `SELECT id FROM social.posts WHERE id = $1 AND author_id = $2::uuid`,
+      [postId, userId]
+    );
+
+    if (!checkResult.rowCount) {
+      throw new HttpError(404, "Post not found or unauthorized", "POST_NOT_FOUND");
+    }
+
+    // Using DELETE so that ON DELETE CASCADE cleans up hypes, comments, media, and hashtags
+    await client.query(`DELETE FROM social.posts WHERE id = $1`, [postId]);
+  });
+};
+
+export const createPost = async ({ user, caption, media, visibility }) => {
   const sanitizedCaption = caption.trim();
+  const validVisibility = ['public', 'followers', 'connections'].includes(visibility) ? visibility : 'public';
 
   if (!sanitizedCaption) {
     throw new HttpError(400, "caption is required", "INVALID_CAPTION");
@@ -314,11 +441,11 @@ export const createPost = async ({ user, caption, media }) => {
   return withTransaction(async (client) => {
     const createResult = await client.query(
       `
-      INSERT INTO social.posts (author_user_id, author_name, author_branch, caption)
-      VALUES ($1, $2, $3, $4)
+      INSERT INTO social.posts (author_id, caption, visibility)
+      VALUES ($1, $2, $3)
       RETURNING id
       `,
-      [user.id, user.name, user.branch, sanitizedCaption]
+      [user.id, sanitizedCaption, validVisibility]
     );
 
     const postId = createResult.rows[0]?.id;
@@ -407,30 +534,29 @@ export const addComment = async ({ postId, user, body }) => {
       `
       UPDATE social.comments
       SET
-        display_name = $3,
-        body = $4,
+        body = $3,
         updated_at = now()
       WHERE post_id = $1
         AND user_id = $2
-      RETURNING id, post_id, user_id, display_name, body, created_at
+      RETURNING id, post_id, user_id, body, created_at
       `,
-      [postId, user.id, user.name, sanitizedBody]
+      [postId, user.id, sanitizedBody]
     );
 
     if (updateResult.rowCount) {
-      return mapComment(updateResult.rows[0]);
+      return mapComment({ ...updateResult.rows[0], display_name: user.name });
     }
 
     const insertResult = await client.query(
       `
-      INSERT INTO social.comments (post_id, user_id, display_name, body)
-      VALUES ($1, $2, $3, $4)
-      RETURNING id, post_id, user_id, display_name, body, created_at
+      INSERT INTO social.comments (post_id, user_id, body)
+      VALUES ($1, $2, $3)
+      RETURNING id, post_id, user_id, body, created_at
       `,
-      [postId, user.id, user.name, sanitizedBody]
+      [postId, user.id, sanitizedBody]
     );
 
-    return mapComment(insertResult.rows[0]);
+    return mapComment({ ...insertResult.rows[0], display_name: user.name });
   });
 };
 

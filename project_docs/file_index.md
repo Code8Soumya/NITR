@@ -1,6 +1,6 @@
 # File Index
 
-**Last Updated**: 2026-03-31
+**Last Updated**: 2026-04-04
 
 This document maps the project directory structure and describes key files. Update this file whenever you create, delete, or significantly modify files.
 
@@ -25,11 +25,12 @@ NITR/
 |  |  |- _layout.tsx                   # Admin-only route-group guard
 |  |  '- approvals.tsx                 # Admin pending-user approvals route
 |  '- (tabs)/
-|     |- _layout.tsx                   # 3-tab navigator
+|     |- _layout.tsx                   # 3-tab navigator + hidden route registration for create/post/profile/edit-profile screens
 |     |- hype/
 |     |  |- index.tsx                  # Tab-1 feed route (with error boundary)
 |     |  |- create.tsx                 # Tab-1 create post route
-|     |  |- profile.tsx                # Authenticated profile edit route (name/nickname/branch/bio/interests; immutable fields shown read-only)
+|     |  |- profile.tsx                # Authenticated profile view route (details + posts + edit-profile navigation)
+|     |  |- edit-profile.tsx           # Dedicated profile edit route wrapper
 |     |  '- [postId].tsx               # Tab-1 post detail route
 |     |- campus/
 |     |  '- index.tsx                  # Tab-2 placeholder screen
@@ -46,7 +47,8 @@ NITR/
 |  |     |  |- AdminApprovalsScreen.tsx # Admin approval dashboard UI with animated action buttons
 |  |     |  |- LoginScreen.tsx          # Login screen UI with animated submit button
 |  |     |  |- PendingApprovalScreen.tsx # Pending-state screen for unapproved users with animated actions
-|  |     |  |- ProfileScreen.tsx        # Profile editor for name/nickname/branch/bio/interests + locked email/gender/birthDate + animated save feedback
+|  |     |  |- ProfileScreen.tsx        # Edit-profile form for name/nickname/branch/bio/interests + locked email/gender/birthDate + animated save feedback
+|  |     |  |- ProfileViewScreen.tsx    # Profile view page with details, sign-out/admin actions, posts list, and edit-profile CTA
 |  |     |  |- RegisterScreen.tsx       # Registration screen UI with calendar birthdate picker (no free-text date input)
 |  |     |  '- VerifyOtpScreen.tsx      # Cognito OTP verification and resend UI with animated buttons
 |  |     |- storage/
@@ -56,22 +58,22 @@ NITR/
 |  |     '- types.ts                   # Auth domain types
 |  |  '- hype/                         # Tab-1 isolated module
 |  |     |- api/
-|  |     |  '- hypeApi.ts              # HTTP API adapter for /api/v1/social with local mock fallback + pre-signed media upload flow
+|  |     |  '- hypeApi.ts              # HTTP API adapter for /api/v1/social with local mock fallback + pre-signed media upload flow (Android-safe local URI blob fallback) + delete-post compatibility fallback when DELETE route is unavailable
 |  |     |- components/
 |  |     |  |- CommentBubble.tsx       # Comment row UI
 |  |     |  |- HashtagRail.tsx         # Trending hashtag filter UI
-|  |     |  '- PostCard.tsx            # Reusable post card UI with contain-fit image/video rendering, viewport-muted autoplay, top user metadata, and stable mute/pause controls
+|  |     |  '- PostCard.tsx            # Reusable post card UI with contain-fit image/video rendering via `expo-video`, viewport-muted autoplay, top user metadata, and stable mute/pause controls
 |  |     |- constants/
 |  |     |  '- mockFeed.ts             # Seed feed data
 |  |     |- hooks/
 |  |     |  |- useHypeActions.ts       # Action hooks over Zustand store
 |  |     |  '- useHypeFeed.ts          # Feed selectors/loading logic
 |  |     |- screens/
-|  |     |  |- CreatePostScreen.tsx    # Create post screen with separate photo/video pickers, photo crop window ratios (9:16/16:9/3:4/4:3/1:1/4:5), strict ratio validation, and hashtag-count guardrail
-|  |     |  |- HypeFeedScreen.tsx      # Feed list screen
+|  |     |  |- CreatePostScreen.tsx    # Create post screen with separate photo/video pickers, photo crop window ratios (9:16/16:9/3:4/4:3/1:1/4:5), strict ratio validation, hashtag-count guardrail, and `expo-video` preview for selected videos
+|  |     |  |- HypeFeedScreen.tsx      # Feed list screen with global 3-state video audio mode toggle (red/yellow/green)
 |  |     |  '- PostDetailScreen.tsx    # Post + comments screen with edit-aware single-comment composer
 |  |     |- store/
-|  |     |  '- hypeStore.ts            # Zustand isolated state/actions
+|  |     |  '- hypeStore.ts            # Zustand isolated state/actions, including global video audio mode state (`forced-muted` | `start-muted` | `start-unmuted`)
 |  |     |- utils/
 |  |     |  '- mediaAspectRatio.ts     # Allowed media ratio constants/helpers for validation, display normalization, and crop aspect dimensions
 |  |     '- types.ts                   # Tab-1 domain types
@@ -84,7 +86,7 @@ NITR/
 |- backend/
 |  '- tab1-social/                     # Tab-1 backend package (Lambda + Aurora + S3)
 |     |- src/
-|     |  |- handler.js                 # Lambda entrypoint; routes social + auth + admin requests
+|     |  |- handler.js                 # Lambda entrypoint; routes social + auth + admin requests (includes POST `/social/posts` delete compatibility action)
 |     |  '- lib/
 |     |     |- auth.js                 # Resolves current user from Cognito JWT claims or dev headers
 |     |     |- authRepository.js       # Account registration/login/profile + admin approval repository layer (immutable profile fields and Cognito sync orchestration)
@@ -92,18 +94,14 @@ NITR/
 |     |     |- db.js                   # PostgreSQL pool and transaction helper (`withTransaction` export)
 |     |     |- errors.js               # `HttpError` abstraction for consistent API errors
 |     |     |- hashtags.js             # Caption hashtag extraction + normalization utilities + max-hashtag limit validator
-|     |     |- http.js                 # API Gateway response helpers + JSON parsing utilities
+|     |     |- http.js                 # API Gateway response helpers + JSON parsing utilities (CORS allow-methods include DELETE)
 |     |     |- logger.js               # Backend structured logging helper for Lambda/runtime errors
 |     |     |- media.js                # S3 media URL helpers (`createMediaUploadUrl`, signed read URL resolution)
 |     |     |- tokenService.js         # JWT signing, verification, and refresh token hash support
 |     |     '- socialRepository.js     # SQL data access layer for feed/posts/hypes/comments/trends with media hydration and live `authorBio` enrichment from `auth.users`
 |     |- sql/
-|     |  |- 001_tab1_social.sql        # Migration: social schema tables, indexes, triggers
-|     |  |- 002_auth_and_admin.sql     # Migration: auth users, approval states, refresh sessions
-|     |  |- 003_auth_cognito_otp.sql   # Migration: Cognito OTP columns and email verification flags
-|     |  |- 004_auth_profile_fields.sql # Migration: full name, nickname, birth date, gender, bio, interests
-|     |  |- 005_comments_one_per_user.sql # Migration: deduplicate historical comments and enforce one comment per user per post
-|     |  '- 006_admin_bypass_and_auth_profile_sync.sql # Migration: auto-approve/admin bootstrap for 122me0914 and align auth profile-sync rollout
+|     |  |- 001_setup.sql              # Consolidated DB Schema: auth + social (uuid, visibility, follows, normalized profiles, strict NOT NULL dates)
+|     |  '- 002_admin_setup.sql        # Migration: auto-approve and grant admin to 122me0914@nitrkl.ac.in
 |     |- scripts/
 |     |  '- runMigration.js            # Applies SQL migration using DATABASE_URL
 |     |- docs/
@@ -115,6 +113,7 @@ NITR/
 |     '- README.md                     # Backend usage, route map, and integration notes
 |- project_docs/
 |  |- architecture.md                  # Tech stack + architecture map
+|  |- database_design.md               # Detailed database schema architecture, limitations, and table logic
 |  |- file_index.md                    # This file
 |  '- active_context.md                # Current task + known issues + next steps
 |- .github/
@@ -134,7 +133,7 @@ NITR/
 |- global.css                          # Tailwind directives for NativeWind
 |- tailwind.config.js                  # NativeWind/Tailwind content and theme
 |- tsconfig.json                       # TypeScript config with path alias
-|- package.json                        # Dependencies and scripts (includes `expo-image-picker`, `expo-av`, and `@react-native-community/datetimepicker`)
+|- package.json                        # Dependencies and scripts (includes `expo-image-picker`, `expo-video`, and `@react-native-community/datetimepicker`)
 |- .env                                # Root Expo environment file (`EXPO_PUBLIC_*`, gitignored)
 '- index.js                            # expo-router entry
 ```
@@ -161,6 +160,8 @@ NITR/
 - `backend/tab1-social/.env` stores local backend values and is consumed by `npm run migrate`.
 - Backend media helper now accepts `SOCIAL_MEDIA_PUBLIC_BASE_URL` values without scheme by normalizing to `https://` and supports signed read URL generation when feed media points to private S3 objects.
 - Tab-1 feed and post-detail responses now hydrate `authorBio` from `auth.users.bio`, so profile bio edits are reflected without recreating posts.
+- Tab-1 backend now supports `GET /api/v1/social/users/{userId}/posts` for profile-post listing with the same visibility rules used by feed reads.
+- Tab-1 delete post now supports a compatibility path through `POST /api/v1/social/posts` with `{ action: "delete", postId }` when API Gateway is temporarily missing the DELETE route for `/api/v1/social/posts/{postId}`.
 - Tab-1 comment mutation now follows one-comment-per-user-per-post semantics (repeat submission edits existing comment).
 - Import alias `@/` is enabled via `babel-plugin-module-resolver`.
 - Lint setup uses ESLint v8 with legacy `.eslintrc.js` for Expo compatibility.
@@ -168,5 +169,9 @@ NITR/
 - Create-post UI now uses device gallery selection (photo/video) and uploads media through `/api/v1/social/media/upload-url` before post creation.
 - Create-post now rejects media assets outside aspect ratios `9:16`, `16:9`, `3:4`, `4:3`, `1:1`, `4:5` before upload.
 - Create-post photo flow opens a crop window constrained to a selected allowed ratio.
-- Feed card UI now shows top author metadata (`name`, `branch`, short `bio`), truncates caption preview, removes bottom hashtag text, and supports in-view muted autoplay with per-video mute/pause controls.
+- Feed card UI now shows top author metadata (`name`, `branch`, short `bio`), truncates caption preview, removes bottom hashtag text, and supports in-view muted autoplay with per-video mute/pause controls via `expo-video`.
 - Frontend and backend both enforce a maximum of 5 unique hashtags per post caption.
+- Video rendering now uses `expo-video` `VideoView` with Android `surfaceType="textureView"` to avoid deprecated `expo-av` warnings and improve clipping/render stability inside feed cards.
+- Create-post media upload now supports fallback local file reading for Android `content://` URIs before S3 PUT upload to avoid generic `Network request failed` errors.
+- Hype header now has a 3-dot overflow menu with Profile entry; editing is accessed from profile view via dedicated Edit Profile button.
+- Hype feed now provides a three-state global video audio mode button: red forced mute, yellow start-muted (unmute allowed), green start-unmuted.

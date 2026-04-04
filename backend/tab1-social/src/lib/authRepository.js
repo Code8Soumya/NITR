@@ -22,7 +22,7 @@ const birthDateRegex = /^\d{4}-\d{2}-\d{2}$/;
 const allowedGenders = new Set(["male", "female", "other"]);
 
 const maxBioLength = 500;
-const maxInterestLength = 40;
+const maxInterestLength = 100;
 const maxInterestsCount = 10;
 
 const userSelectColumns = `
@@ -437,7 +437,7 @@ const validateRegistrationInput = ({
   if (!nicknameRegex.test(normalizedNickname)) {
     throw new HttpError(
       400,
-      "nickname must be 3-30 chars and include only lowercase letters, numbers, dot, dash, underscore",
+      "username must be 3-30 chars and include only lowercase letters, numbers, dot, dash, underscore",
       "INVALID_NICKNAME"
     );
   }
@@ -692,7 +692,7 @@ export const registerUser = async ({
     }
 
     if (existing.kind === "nickname") {
-      throw new HttpError(409, "Nickname is already taken", "NICKNAME_EXISTS");
+      throw new HttpError(409, "Username is already taken", "NICKNAME_EXISTS");
     }
 
     throw new HttpError(409, "An account with this email already exists", "EMAIL_EXISTS");
@@ -810,7 +810,7 @@ ${userSelectColumns}
       const detail = String(error?.detail ?? "");
 
       if (detail.includes("(nickname)")) {
-        throw new HttpError(409, "Nickname is already taken", "NICKNAME_EXISTS");
+        throw new HttpError(409, "Username is already taken", "NICKNAME_EXISTS");
       }
 
       if (detail.includes("(email)")) {
@@ -1157,31 +1157,9 @@ export const resendUserOtp = async ({ email }) => {
   };
 };
 
-export const updateUserProfile = async ({
-  userId,
-  name,
-  nickname,
-  branch,
-  bio,
-  interests,
-  email,
-  gender,
-  birthDate,
-  birthdate,
-  birth_date
-}) => {
-  const patch = validateProfilePatchInput({
-    name,
-    nickname,
-    branch,
-    bio,
-    interests,
-    email,
-    gender,
-    birthDate,
-    birthdate,
-    birth_date
-  });
+export const updateUserProfile = async (input) => {
+  const { userId, ...profileFields } = input;
+  const patch = validateProfilePatchInput(profileFields);
 
   try {
     return await withTransaction(async (client) => {
@@ -1212,12 +1190,22 @@ ${userSelectColumns}
           : currentUser.nickname;
 
       const shouldSyncCognito =
-        isCognitoOtpEnabled() &&
-        (nextName !== currentUser.full_name || nextNickname !== currentUser.nickname);
+          !!currentUser.cognito_sub &&
+          (nextName !== currentUser.full_name || nextNickname !== currentUser.nickname);
 
-      if (shouldSyncCognito) {
-        await updateCognitoProfile({
-          email: currentUser.email,
+        if (Object.prototype.hasOwnProperty.call(patch, "nickname") && patch.nickname !== currentUser.nickname) {
+          const nicknameCheck = await client.query(
+            `SELECT 1 FROM auth.users WHERE nickname = $1 AND id != $2 LIMIT 1`,
+            [patch.nickname, userId]
+          );
+          if (nicknameCheck.rowCount > 0) {
+            throw new HttpError(409, "Username is already taken", "NICKNAME_EXISTS");
+          }
+        }
+
+        if (shouldSyncCognito) {
+          await updateCognitoProfile({
+            username: currentUser.cognito_sub,
           name: nextName,
           nickname: nextNickname
         });
@@ -1277,7 +1265,7 @@ ${userSelectColumns}
     if (error?.code === "23505") {
       const detail = String(error?.detail ?? "");
       if (detail.includes("(nickname)")) {
-        throw new HttpError(409, "Nickname is already taken", "NICKNAME_EXISTS");
+        throw new HttpError(409, "Username is already taken", "NICKNAME_EXISTS");
       }
     }
 

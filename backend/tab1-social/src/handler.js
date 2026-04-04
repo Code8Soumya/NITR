@@ -27,8 +27,10 @@ import { createMediaUploadUrl } from "./lib/media.js";
 import {
   addComment,
   createPost,
+  deletePost,
   getPostById,
   getTrendingHashtags,
+  listUserPosts,
   listFeed,
   toggleHype
 } from "./lib/socialRepository.js";
@@ -81,6 +83,7 @@ const maxFeedLimit = Number.parseInt(process.env.MAX_FEED_LIMIT ?? "50", 10);
 const postHypesPattern = /^\/api\/v1\/social\/posts\/([0-9a-f-]{36})\/hypes$/i;
 const postCommentsPattern = /^\/api\/v1\/social\/posts\/([0-9a-f-]{36})\/comments$/i;
 const singlePostPattern = /^\/api\/v1\/social\/posts\/([0-9a-f-]{36})$/i;
+const userPostsPattern = /^\/api\/v1\/social\/users\/([0-9a-f-]{36})\/posts$/i;
 const adminApprovePattern = /^\/api\/v1\/admin\/approvals\/([0-9a-f-]{36})\/approve$/i;
 const adminRejectPattern = /^\/api\/v1\/admin\/approvals\/([0-9a-f-]{36})\/reject$/i;
 
@@ -201,16 +204,7 @@ export const handler = async (event) => {
 
       const user = await updateUserProfile({
         userId: authUser.id,
-        name: payload.name,
-        nickname: payload.nickname,
-        branch: payload.branch,
-        bio: payload.bio,
-        interests: payload.interests,
-        email: payload.email,
-        gender: payload.gender,
-        birthDate: payload.birthDate,
-        birthdate: payload.birthdate,
-        birth_date: payload.birth_date
+        ...payload
       });
 
       return jsonResponse(200, { data: user });
@@ -276,9 +270,50 @@ export const handler = async (event) => {
       return jsonResponse(200, { data: feed });
     }
 
+    const userPostsMatch = path.match(userPostsPattern);
+    if (method === "GET" && userPostsMatch) {
+      const query = event.queryStringParameters ?? {};
+      const authUser = requireApprovedUser(event);
+      const profileUserId = userPostsMatch[1];
+
+      validateUuid(profileUserId, "userId");
+
+      const limit = parsePositiveInt({
+        value: query.limit,
+        field: "limit",
+        fallback: defaultFeedLimit,
+        min: 1,
+        max: maxFeedLimit
+      });
+
+      const posts = await listUserPosts({
+        currentUserId: authUser.id,
+        profileUserId,
+        cursor: query.cursor,
+        limit,
+        maxLimit: maxFeedLimit
+      });
+
+      return jsonResponse(200, { data: posts });
+    }
+
     if (method === "POST" && path === "/api/v1/social/posts") {
       const user = requireApprovedUser(event);
       const payload = parseJsonBody(event);
+
+      const action = typeof payload.action === "string" ? payload.action.trim().toLowerCase() : "";
+      if (action === "delete") {
+        const postId = typeof payload.postId === "string" ? payload.postId.trim() : "";
+
+        if (!postId) {
+          throw new HttpError(400, "postId is required when action=delete", "INVALID_ID");
+        }
+
+        validateUuid(postId, "postId");
+        await deletePost({ postId, userId: user.id });
+        return jsonResponse(200, { data: { success: true } });
+      }
+
       const caption = typeof payload.caption === "string" ? payload.caption.trim() : "";
 
       if (!caption) {
@@ -290,12 +325,14 @@ export const handler = async (event) => {
         throw new HttpError(400, "At least one media item (photo or video) is required", "INVALID_MEDIA");
       }
 
-      const post = await createPost({ user, caption, media });
+      const visibility = typeof payload.visibility === "string" ? payload.visibility.toLowerCase() : "public";
+
+      const post = await createPost({ user, caption, media, visibility });
 
       return jsonResponse(201, { data: post });
     }
 
-    const singlePostMatch = path.match(singlePostPattern);
+    const singlePostMatch = path.match(singlePostPattern) || path.match(/^\/api\/v1\/hype\/posts\/([0-9a-f-]{36})$/i);
     if (method === "GET" && singlePostMatch) {
       const postId = singlePostMatch[1];
       validateUuid(postId, "postId");
@@ -303,6 +340,17 @@ export const handler = async (event) => {
       const user = requireApprovedUser(event);
       const post = await getPostById({ postId, userId: user.id });
       return jsonResponse(200, { data: post });
+    }
+
+    if (method === "DELETE" && singlePostMatch) {
+      const postId = singlePostMatch[1];
+      validateUuid(postId, "postId");
+      
+      const user = requireApprovedUser(event);
+      // We import deletePost at the top (ensure it's exported from socialRepository)
+      await deletePost({ postId, userId: user.id });
+      
+      return jsonResponse(200, { data: { success: true } });
     }
 
     const hypesMatch = path.match(postHypesPattern);

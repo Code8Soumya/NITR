@@ -68,10 +68,36 @@ Failure:
 }
 ```
 
-2. `GET /api/v1/social/posts/{postId}`
+2. `GET /api/v1/social/users/{userId}/posts`
+- Query: `limit` (1-50), `cursor`
+- Returns:
+
+```json
+{
+  "data": {
+    "items": [],
+    "nextCursor": "optional-base64-cursor"
+  }
+}
+```
+
+3. `GET /api/v1/social/posts/{postId}`
 - Returns one feed item in `data`.
 
-3. `POST /api/v1/social/posts`
+4. `DELETE /api/v1/social/posts/{postId}`
+- Returns:
+
+```json
+{
+  "data": {
+    "success": true
+  }
+}
+```
+
+*Compatibility note:* if an API Gateway deployment has not wired the DELETE route yet, clients can call `POST /api/v1/social/posts` with `{ "action": "delete", "postId": "uuid" }`.
+
+5. `POST /api/v1/social/posts`
 - Body:
 
 ```json
@@ -87,7 +113,7 @@ Failure:
 - Caption supports at most 5 unique hashtags; otherwise API returns `HASHTAG_LIMIT_EXCEEDED`.
 - Frontend upload policy supports media ratios `9:16`, `16:9`, `3:4`, `4:3`, `1:1`, `4:5`.
 
-4. `POST /api/v1/social/posts/{postId}/hypes`
+6. `POST /api/v1/social/posts/{postId}/hypes`
 - Body: none
 - Returns:
 
@@ -101,7 +127,7 @@ Failure:
 }
 ```
 
-5. `POST /api/v1/social/posts/{postId}/comments`
+7. `POST /api/v1/social/posts/{postId}/comments`
 - Body:
 
 ```json
@@ -110,7 +136,7 @@ Failure:
 
 *Note: each user can keep only one comment per post; posting again updates the previous comment.*
 
-6. `GET /api/v1/social/hashtags/trending`
+8. `GET /api/v1/social/hashtags/trending`
 - Query: `limit` (1-20)
 - Returns:
 
@@ -122,7 +148,7 @@ Failure:
 }
 ```
 
-7. `POST /api/v1/social/media/upload-url`
+9. `POST /api/v1/social/media/upload-url`
 - Body:
 
 ```json
@@ -148,7 +174,7 @@ Failure:
 
 ## Auth Endpoints
 
-8. `POST /api/v1/auth/register`
+10. `POST /api/v1/auth/register`
 - Body:
 
 ```json
@@ -212,7 +238,7 @@ Failure:
 }
 ```
 
-9. `POST /api/v1/auth/verify-otp`
+11. `POST /api/v1/auth/verify-otp`
 - Body:
 
 ```json
@@ -238,7 +264,7 @@ Failure:
 }
 ```
 
-10. `POST /api/v1/auth/resend-otp`
+12. `POST /api/v1/auth/resend-otp`
 - Body:
 
 ```json
@@ -263,7 +289,7 @@ Failure:
 }
 ```
 
-11. `POST /api/v1/auth/login`
+13. `POST /api/v1/auth/login`
 - Body:
 
 ```json
@@ -275,7 +301,7 @@ Failure:
 
 - Returns: same envelope as register.
 
-12. `POST /api/v1/auth/refresh`
+14. `POST /api/v1/auth/refresh`
 - Body:
 
 ```json
@@ -286,7 +312,7 @@ Failure:
 
 - Returns: same envelope as register with rotated tokens.
 
-13. `PUT /api/v1/auth/profile`
+15. `PUT /api/v1/auth/profile`
 - Header: `Authorization: Bearer <accessToken>`
 - Body (any subset):
 
@@ -303,11 +329,11 @@ Failure:
 - Immutable fields: `email`, `birthDate`, and `gender` cannot be changed after registration.
 - Returns `data` with updated user profile.
 
-14. `GET /api/v1/auth/me`
+16. `GET /api/v1/auth/me`
 - Header: `Authorization: Bearer <accessToken>`
 - Returns `data` with user profile.
 
-15. `POST /api/v1/auth/logout`
+17. `POST /api/v1/auth/logout`
 - Header: `Authorization: Bearer <accessToken>`
 - Body:
 
@@ -329,15 +355,15 @@ Failure:
 
 ## Admin Approval Endpoints
 
-16. `GET /api/v1/admin/approvals/pending`
+18. `GET /api/v1/admin/approvals/pending`
 - Header: `Authorization: Bearer <adminAccessToken>`
 - Returns `data` as list of pending users.
 
-17. `POST /api/v1/admin/approvals/{userId}/approve`
+19. `POST /api/v1/admin/approvals/{userId}/approve`
 - Header: `Authorization: Bearer <adminAccessToken>`
 - Returns `data` with updated approved user.
 
-18. `POST /api/v1/admin/approvals/{userId}/reject`
+20. `POST /api/v1/admin/approvals/{userId}/reject`
 - Header: `Authorization: Bearer <adminAccessToken>`
 - Body:
 

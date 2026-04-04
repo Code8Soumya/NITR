@@ -31,6 +31,7 @@ export default function TabsLayout() {
       screenOptions={{
         headerStyle: { backgroundColor: "#fffaf2" },
         headerTitleStyle: { fontWeight: "700" },
+        headerShadowVisible: false,
         tabBarActiveTintColor: "#bf2f50",
         tabBarInactiveTintColor: "#6b7280",
         tabBarStyle: { height: 64, paddingBottom: 8, paddingTop: 8 }
@@ -63,6 +64,7 @@ export default function TabsLayout() {
       <Tabs.Screen name="hype/create" options={{ href: null, title: "Create Post" }} />
       <Tabs.Screen name="hype/[postId]" options={{ href: null, title: "Post" }} />
       <Tabs.Screen name="hype/profile" options={{ href: null, title: "Profile" }} />
+      <Tabs.Screen name="hype/edit-profile" options={{ href: null, title: "Edit Profile" }} />
     </Tabs>
   );
 }

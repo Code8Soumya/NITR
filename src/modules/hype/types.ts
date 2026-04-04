@@ -2,6 +2,8 @@ import { type AllowedMediaAspectRatioLabel } from "@/modules/hype/utils/mediaAsp
 
 export type HypeMediaType = "image" | "video";
 
+export type HypeVideoAudioMode = "forced-muted" | "start-muted" | "start-unmuted";
+
 export type HypeMedia = {
   id: string;
   uri: string;

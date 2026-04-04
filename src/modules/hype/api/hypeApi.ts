@@ -53,6 +53,9 @@ const validateHashtagLimit = (caption: string): string[] => {
   return hashtags;
 };
 
+const isRouteMissing404 = (error: unknown): boolean =>
+  error instanceof Error && error.message.trim() === "Request failed (404)";
+
 const isRemoteUri = (uri: string): boolean => /^https?:\/\//i.test(uri);
 
 const defaultMimeType = (mediaType: HypeMediaType): string =>
@@ -68,6 +71,34 @@ const inferFileName = (uri: string, mediaType: HypeMediaType): string => {
   return `upload-${Date.now()}.${extension}`;
 };
 
+const readLocalMediaBlob = async (localUri: string): Promise<Blob> => {
+  try {
+    const localResponse = await fetch(localUri);
+    if (localResponse.ok) {
+      return await localResponse.blob();
+    }
+  } catch {
+    // Fall through to XHR blob loader for Android content:// URIs.
+  }
+
+  return new Promise<Blob>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.onerror = () => reject(new Error("Unable to read selected media file"));
+    xhr.onload = () => {
+      if (!xhr.response) {
+        reject(new Error("Unable to read selected media file"));
+        return;
+      }
+
+      resolve(xhr.response as Blob);
+    };
+
+    xhr.responseType = "blob";
+    xhr.open("GET", localUri, true);
+    xhr.send();
+  });
+};
+
 const uploadMediaBinary = async ({
   localUri,
   uploadUrl,
@@ -77,12 +108,7 @@ const uploadMediaBinary = async ({
   uploadUrl: string;
   mimeType: string;
 }): Promise<void> => {
-  const localResponse = await fetch(localUri);
-  if (!localResponse.ok) {
-    throw new Error("Unable to read selected media file");
-  }
-
-  const fileBlob = await localResponse.blob();
+  const fileBlob = await readLocalMediaBlob(localUri);
   const uploadResponse = await fetch(uploadUrl, {
     method: "PUT",
     headers: {
@@ -92,7 +118,12 @@ const uploadMediaBinary = async ({
   });
 
   if (!uploadResponse.ok) {
-    throw new Error(`Media upload failed (${uploadResponse.status})`);
+    const preview = (await uploadResponse.text().catch(() => "")).slice(0, 140);
+    throw new Error(
+      preview
+        ? `Media upload failed (${uploadResponse.status}): ${preview}`
+        : `Media upload failed (${uploadResponse.status})`
+    );
   }
 };
 
@@ -205,6 +236,19 @@ const mockApi = {
     }
 
     return base.filter((post) => post.hashtags.includes(query.hashtag!));
+  },
+
+  async getUserPosts(userId: string): Promise<HypePost[]> {
+    await sleep(220);
+    const base = [...feedDb].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+    return base.filter((post) => post.userId === userId);
+  },
+
+  async deletePost(postId: string): Promise<void> {
+    await sleep(150);
+    feedDb = feedDb.filter((post) => post.id !== postId);
   },
 
   async createPost(payload: CreatePostPayload): Promise<HypePost> {
@@ -332,6 +376,48 @@ export const hypeApi = {
     const suffix = params.size ? `?${params.toString()}` : "";
     const payload = await request<{ items: HypePost[] }>(`/api/v1/social/posts${suffix}`);
     return payload.items;
+  },
+
+  async getUserPosts(userId: string): Promise<HypePost[]> {
+    if (!apiBaseUrl) {
+      return mockApi.getUserPosts(userId);
+    }
+    const payload = await request<{ items: HypePost[] }>(`/api/v1/social/users/${encodeURIComponent(userId)}/posts`);
+    return payload.items;
+  },
+
+  async deletePost(postId: string): Promise<void> {
+    if (!apiBaseUrl) {
+      return mockApi.deletePost(postId);
+    }
+
+    const encodedPostId = encodeURIComponent(postId);
+
+    try {
+      await request(`/api/v1/social/posts/${encodedPostId}`, {
+        method: "DELETE"
+      });
+      return;
+    } catch (error) {
+      if (!isRouteMissing404(error)) {
+        throw error;
+      }
+
+      appLogger.warn("Primary delete route unavailable; trying compatibility delete action", {
+        file: "src/modules/hype/api/hypeApi.ts",
+        location: "hypeApi.deletePost",
+        action: "fallback delete via POST /api/v1/social/posts",
+        details: { postId }
+      });
+    }
+
+    await request("/api/v1/social/posts", {
+      method: "POST",
+      body: JSON.stringify({
+        action: "delete",
+        postId
+      })
+    });
   },
 
   async createPost(payload: CreatePostPayload): Promise<HypePost> {

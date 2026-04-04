@@ -50,12 +50,18 @@ Base path: `/api/v1/social`
 
 1. `GET /health`
 2. `GET /posts?limit=20&cursor=...&hashtag=#fest`
-3. `GET /posts/{postId}`
-4. `POST /posts`
-5. `POST /posts/{postId}/hypes`
-6. `POST /posts/{postId}/comments`
-7. `GET /hashtags/trending?limit=10`
-8. `POST /media/upload-url`
+3. `GET /users/{userId}/posts?limit=20&cursor=...`
+4. `GET /posts/{postId}`
+5. `DELETE /posts/{postId}`
+6. `POST /posts`
+7. `POST /posts/{postId}/hypes`
+8. `POST /posts/{postId}/comments`
+9. `GET /hashtags/trending?limit=10`
+10. `POST /media/upload-url`
+
+Compatibility fallback for delete (if API Gateway route for DELETE is not yet wired):
+
+- `POST /posts` with payload `{ "action": "delete", "postId": "<uuid>" }`
 
 Base path: `/api/v1/auth`
 

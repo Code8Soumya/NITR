@@ -204,29 +204,35 @@ Routes:
 
 1. `GET /api/v1/social/health`
 2. `GET /api/v1/social/posts`
-3. `GET /api/v1/social/posts/{postId}`
-4. `POST /api/v1/social/posts`
-5. `POST /api/v1/social/posts/{postId}/hypes`
-6. `POST /api/v1/social/posts/{postId}/comments`
-7. `GET /api/v1/social/hashtags/trending`
-8. `POST /api/v1/social/media/upload-url`
-9. `POST /api/v1/auth/register`
-10. `POST /api/v1/auth/verify-otp`
-11. `POST /api/v1/auth/resend-otp`
-12. `POST /api/v1/auth/login`
-13. `PUT /api/v1/auth/profile`
-14. `POST /api/v1/auth/refresh`
-15. `POST /api/v1/auth/logout`
-16. `GET /api/v1/auth/me`
-17. `GET /api/v1/admin/approvals/pending`
-18. `POST /api/v1/admin/approvals/{userId}/approve`
-19. `POST /api/v1/admin/approvals/{userId}/reject`
+3. `GET /api/v1/social/users/{userId}/posts`
+4. `GET /api/v1/social/posts/{postId}`
+5. `DELETE /api/v1/social/posts/{postId}`
+6. `POST /api/v1/social/posts`
+7. `POST /api/v1/social/posts/{postId}/hypes`
+8. `POST /api/v1/social/posts/{postId}/comments`
+9. `GET /api/v1/social/hashtags/trending`
+10. `POST /api/v1/social/media/upload-url`
+11. `POST /api/v1/auth/register`
+12. `POST /api/v1/auth/verify-otp`
+13. `POST /api/v1/auth/resend-otp`
+14. `POST /api/v1/auth/login`
+15. `PUT /api/v1/auth/profile`
+16. `POST /api/v1/auth/refresh`
+17. `POST /api/v1/auth/logout`
+18. `GET /api/v1/auth/me`
+19. `GET /api/v1/admin/approvals/pending`
+20. `POST /api/v1/admin/approvals/{userId}/approve`
+21. `POST /api/v1/admin/approvals/{userId}/reject`
+
+Compatibility delete fallback (when DELETE route is temporarily missing in API Gateway):
+
+- `POST /api/v1/social/posts` with body `{ "action": "delete", "postId": "<uuid>" }`
 
 CORS:
 
 1. Allow only your known client origins.
 2. Allow headers: `Content-Type,Authorization,X-Dev-User-Id,X-Dev-User-Name,X-Dev-User-Branch,X-Dev-User-Email`.
-3. Allow methods: `GET,POST,PUT,OPTIONS`.
+3. Allow methods: `GET,POST,PUT,DELETE,OPTIONS`.
 
 ## 9. Cognito OTP Setup
 
@@ -278,9 +284,11 @@ After deployment:
 1. `GET /api/v1/social/health` returns `status: ok`.
 2. `POST /api/v1/social/posts` creates a post.
 3. `GET /api/v1/social/posts` returns created post.
-4. `POST /api/v1/social/posts/{postId}/hypes` toggles hype.
-5. `POST /api/v1/social/posts/{postId}/comments` upserts to one comment per user per post.
-6. `POST /api/v1/social/media/upload-url` returns `uploadUrl`, `publicUrl`, `key`.
+4. `GET /api/v1/social/users/{userId}/posts` returns profile posts for the requested user (respecting visibility rules).
+5. `DELETE /api/v1/social/posts/{postId}` removes an owned post.
+6. `POST /api/v1/social/posts/{postId}/hypes` toggles hype.
+7. `POST /api/v1/social/posts/{postId}/comments` upserts to one comment per user per post.
+8. `POST /api/v1/social/media/upload-url` returns `uploadUrl`, `publicUrl`, `key`.
 
 ## 12. Good-Practice Checklist
 

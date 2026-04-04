@@ -11,7 +11,7 @@ const buildHeaders = () => ({
   "Access-Control-Allow-Origin": corsOrigin,
   "Access-Control-Allow-Headers":
     "Content-Type,Authorization,X-Dev-User-Id,X-Dev-User-Name,X-Dev-User-Branch,X-Dev-User-Email",
-  "Access-Control-Allow-Methods": "GET,POST,PUT,OPTIONS"
+  "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
 });
 
 export const jsonResponse = (statusCode, payload) => ({

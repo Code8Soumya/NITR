@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { type AVPlaybackStatus, ResizeMode, Video } from "expo-av";
+import { useEffect, useMemo, useState } from "react";
+import { VideoView, useVideoPlayer } from "expo-video";
 import { Image, Pressable, Text, View } from "react-native";
 
-import { type HypePost } from "@/modules/hype/types";
+import { type HypePost, type HypeVideoAudioMode } from "@/modules/hype/types";
 import {
   getAspectRatioValueFromLabel,
   resolveAllowedAspectRatioLabel
@@ -12,8 +12,10 @@ type PostCardProps = {
   post: HypePost;
   onOpen: () => void;
   onToggleHype: () => void;
+  onDelete?: () => void;
   isVisible?: boolean;
   disableAutoPlay?: boolean;
+  videoAudioMode?: HypeVideoAudioMode;
 };
 
 const timeAgo = (isoDate: string): string => {
@@ -89,19 +91,21 @@ export function PostCard({
   post,
   onOpen,
   onToggleHype,
+  onDelete,
   isVisible = true,
-  disableAutoPlay = false
+  disableAutoPlay = false,
+  videoAudioMode = "start-muted"
 }: PostCardProps) {
   const firstMedia = post.media[0];
   const showVideo = firstMedia?.mediaType === "video";
   const showImage = firstMedia?.mediaType === "image";
-  const videoRef = useRef<Video | null>(null);
+  const isForcedMuted = videoAudioMode === "forced-muted";
+  const shouldStartMuted = videoAudioMode !== "start-unmuted";
   const [imageLoadFailed, setImageLoadFailed] = useState(false);
   const [videoLoadFailed, setVideoLoadFailed] = useState(false);
   const [mediaAspectRatio, setMediaAspectRatio] = useState(() => getInitialAspectRatio(post));
-  const [isMuted, setIsMuted] = useState(true);
+  const [isMuted, setIsMuted] = useState(shouldStartMuted);
   const [isPausedByUser, setIsPausedByUser] = useState(false);
-  const [isVideoPlaying, setIsVideoPlaying] = useState(false);
 
   const imageUri = useMemo(() => {
     if (!firstMedia || firstMedia.mediaType !== "image") {
@@ -119,14 +123,51 @@ export function PostCard({
     return normalizeRenderableUri(firstMedia.uri);
   }, [firstMedia]);
 
+  const videoPlayer = useVideoPlayer(videoUri || null, (player) => {
+    player.loop = true;
+    player.muted = shouldStartMuted;
+  });
+
   useEffect(() => {
     setImageLoadFailed(false);
     setVideoLoadFailed(false);
     setMediaAspectRatio(getInitialAspectRatio(post));
-    setIsMuted(true);
+    setIsMuted(shouldStartMuted);
     setIsPausedByUser(false);
-    setIsVideoPlaying(false);
-  }, [post]);
+    videoPlayer.pause();
+    videoPlayer.muted = shouldStartMuted;
+  }, [post, shouldStartMuted, videoPlayer]);
+
+  useEffect(() => {
+    if (!showVideo || !videoUri) {
+      return;
+    }
+
+    const statusSubscription = videoPlayer.addListener("statusChange", ({ status }) => {
+      if (status === "error") {
+        setVideoLoadFailed(true);
+      }
+
+      if (status === "readyToPlay") {
+        setVideoLoadFailed(false);
+      }
+    });
+
+    const videoTrackSubscription = videoPlayer.addListener("videoTrackChange", ({ videoTrack }) => {
+      const width = Number(videoTrack?.size?.width ?? 0);
+      const height = Number(videoTrack?.size?.height ?? 0);
+      const nextAspectRatio = normalizeMeasuredAspectRatio(width, height);
+
+      if (nextAspectRatio) {
+        setMediaAspectRatio(nextAspectRatio);
+      }
+    });
+
+    return () => {
+      statusSubscription.remove();
+      videoTrackSubscription.remove();
+    };
+  }, [showVideo, videoPlayer, videoUri]);
 
   useEffect(() => {
     if (!imageUri || firstMedia?.mediaType !== "image") {
@@ -152,18 +193,48 @@ export function PostCard({
       return;
     }
 
-    if (!isVisible || disableAutoPlay) {
-      void videoRef.current?.pauseAsync();
+    if (!isVisible || disableAutoPlay || isPausedByUser || videoLoadFailed) {
+      videoPlayer.pause();
       return;
     }
 
-    setIsPausedByUser(false);
-    setIsMuted(true);
-    void videoRef.current?.setIsMutedAsync(true);
-    void videoRef.current?.playAsync();
-  }, [disableAutoPlay, isVisible, showVideo]);
+    setIsMuted(shouldStartMuted);
+    videoPlayer.muted = shouldStartMuted;
+    videoPlayer.play();
+  }, [
+    disableAutoPlay,
+    isPausedByUser,
+    isVisible,
+    showVideo,
+    shouldStartMuted,
+    videoLoadFailed,
+    videoPlayer
+  ]);
 
-  const shouldPlayVideo = showVideo && isVisible && !disableAutoPlay && !isPausedByUser;
+  useEffect(() => {
+    if (!showVideo) {
+      return;
+    }
+
+    if (videoAudioMode === "start-unmuted") {
+      setIsMuted(false);
+      videoPlayer.muted = false;
+      return;
+    }
+
+    setIsMuted(true);
+    videoPlayer.muted = true;
+  }, [showVideo, videoAudioMode, videoPlayer]);
+
+  useEffect(() => {
+    if (!showVideo) {
+      return;
+    }
+
+    videoPlayer.muted = isMuted;
+  }, [isMuted, showVideo, videoPlayer]);
+
+  const shouldPlayVideo = showVideo && isVisible && !disableAutoPlay && !isPausedByUser && !videoLoadFailed;
   const authorBioPreview = post.authorBio?.trim() || "No bio added yet";
 
   return (
@@ -181,7 +252,11 @@ export function PostCard({
             {authorBioPreview}
           </Text>
         </View>
-        {firstMedia ? (
+        {onDelete ? (
+          <Pressable onPress={onDelete} className="rounded-full bg-rose-100 px-3 py-1">
+            <Text className="text-xs font-bold text-rose-600">DELETE</Text>
+          </Pressable>
+        ) : firstMedia ? (
           <View className="rounded-full bg-slate-100 px-3 py-1">
             <Text className="text-xs font-semibold text-slate-700">
               {firstMedia.mediaType === "video" ? "VIDEO" : "PHOTO"}
@@ -209,47 +284,35 @@ export function PostCard({
 
       {showVideo && videoUri && !videoLoadFailed ? (
         <View className="relative mt-3 overflow-hidden bg-slate-900" style={{ aspectRatio: mediaAspectRatio }}>
-          <Video
-            ref={videoRef}
-            source={{ uri: videoUri }}
-            className="h-full w-full"
-            resizeMode={ResizeMode.CONTAIN}
-            shouldPlay={shouldPlayVideo}
-            isLooping
-            isMuted={isMuted}
-            onPlaybackStatusUpdate={(status: AVPlaybackStatus) => {
-              if (!status.isLoaded) {
-                return;
-              }
-
-              setIsVideoPlaying(status.isPlaying);
-            }}
-            onReadyForDisplay={(event) => {
-              const width = Number(event.naturalSize?.width ?? 0);
-              const height = Number(event.naturalSize?.height ?? 0);
-              const nextAspectRatio = normalizeMeasuredAspectRatio(width, height);
-
-              if (nextAspectRatio) {
-                setMediaAspectRatio(nextAspectRatio);
-              }
-            }}
-            onError={() => {
-              setVideoLoadFailed(true);
-            }}
+          <VideoView
+            player={videoPlayer}
+            style={{ width: '100%', height: '100%' }}
+            contentFit="contain"
+            nativeControls={false}
+            surfaceType="textureView"
+            useExoShutter={false}
           />
 
           <View className="absolute bottom-3 right-3 flex-row">
             <Pressable
-              className="rounded-full bg-black/70 px-3 py-1"
+              className={`rounded-full bg-black/70 px-3 py-1 ${isForcedMuted ? "opacity-50" : "opacity-100"}`}
               android_ripple={{ color: "#334155" }}
+              disabled={isForcedMuted}
               onPress={(event) => {
                 event.stopPropagation();
+
+                if (isForcedMuted) {
+                  return;
+                }
+
                 const nextMuted = !isMuted;
                 setIsMuted(nextMuted);
-                void videoRef.current?.setIsMutedAsync(nextMuted);
+                videoPlayer.muted = nextMuted;
               }}
             >
-              <Text className="text-xs font-semibold text-white">{isMuted ? "Unmute" : "Mute"}</Text>
+              <Text className="text-xs font-semibold text-white">
+                {isForcedMuted ? "Muted" : isMuted ? "Unmute" : "Mute"}
+              </Text>
             </Pressable>
 
             <Pressable
@@ -262,14 +325,14 @@ export function PostCard({
                 setIsPausedByUser(nextPausedState);
 
                 if (nextPausedState) {
-                  void videoRef.current?.pauseAsync();
+                  videoPlayer.pause();
                 } else {
-                  void videoRef.current?.playAsync();
+                  videoPlayer.play();
                 }
               }}
             >
               <Text className="text-xs font-semibold text-white">
-                {isPausedByUser || !isVideoPlaying ? "Play" : "Pause"}
+                {shouldPlayVideo ? "Pause" : "Play"}
               </Text>
             </Pressable>
           </View>

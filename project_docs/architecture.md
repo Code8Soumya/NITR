@@ -1,6 +1,6 @@
 # Architecture Documentation
 
-**Last Updated**: 2026-03-31
+**Last Updated**: 2026-04-04
 
 ## Application Overview
 
@@ -27,15 +27,21 @@ Core features: NITR email verification (@nitrkl.ac.in), AI-powered peer matching
 - Production auth and admin-approval flows are implemented in the same backend package (`/api/v1/auth/*`, `/api/v1/admin/*`) with JWT access/refresh tokens, secure password hashing, pending/approved/rejected account states, and Cognito OTP verification for registration.
   - **AWS Cognito PrivateLink strict constraint**: Do NOT enable "Managed Login" (Hosted UI) in the AWS Cognito User Pool. AWS PrivateLink (VPC Interface Endpoints for `cognito-idp`) throws `INVALID_COGNITO_PARAMETERS` regarding PrivateLink API access if Managed Login is enabled on the domain.
 - Cognito OTP in private-subnet Lambda supports either NAT egress to public `cognito-idp` or `com.amazonaws.<region>.cognito-idp` interface endpoint with user-pool PrivateLink enabled.
-- Auth registration now captures Cognito-required attributes (`name`, `nickname`, `birthDate`, `gender`) and app profile fields (`bio`, `interests`) in PostgreSQL.
+- Database is natively optimized with Postgres-specific `uuid`, `timestamptz`, Array, and CHECK (`visibility`) features. Data like `author_name` is heavily normalized and extracted purely via `JOIN`s against `auth.users`.
+- Auth registration now captures Cognito-required attributes (`name`, `nickname`, `birthDate`, `gender`) and app profile fields (`bio`, `interests`) in PostgreSQL. `birth_date` is enforced strictly as a `NOT NULL` required field at the database level.
+- Post feeds restrict row delivery based on a cross-join against `social.follows` matching the author's defined `visibility` rule (`public`, `followers`, `connections`).
 - Auth profile updates now support `name`, `nickname`, `branch`, `bio`, and `interests` while keeping `email`, `birthDate`, and `gender` immutable after signup.
 - Register screen now uses calendar-based birthdate selection via `@react-native-community/datetimepicker` to avoid malformed date input.
 - Tab-1 frontend `hypeApi.ts` now calls `/api/v1/social/*` HTTP endpoints and falls back to in-memory mock mode when `EXPO_PUBLIC_SOCIAL_API_BASE_URL` is missing.
 - Tab-1 create-post flow now uses `expo-image-picker` to select local photo/video media and uploads binary files via `/api/v1/social/media/upload-url` before creating the post.
+- Tab-1 create-post upload now supports Android `content://` and `file://` local URIs reliably by using blob-fallback loading before S3 PUT upload to prevent intermittent `Network request failed` errors.
 - Tab-1 create-post now enforces allowed media aspect ratios (`9:16`, `16:9`, `3:4`, `4:3`, `1:1`, `4:5`) for photos/videos and opens a photo crop window with the selected target ratio before upload.
 - Tab-1 feed cards now render both photos and videos with aspect-ratio-aware containers, contain-fit media rendering, muted autoplay while in-view, and explicit mute/pause controls on video posts.
+- Tab-1 video playback is migrated from deprecated `expo-av` `Video` to `expo-video` (`VideoView` + `useVideoPlayer`) to eliminate SDK warnings and improve Android rendering reliability.
+- Tab-1 Hype feed now has a global three-state video audio mode: red = force-muted (cannot unmute), yellow = start-muted (manual unmute allowed), green = start-unmuted.
+- Tab-1 Hype header overflow menu now uses a Profile shortcut (instead of direct edit), with editing moved to a dedicated in-profile action.
 - Tab-1 post creation now enforces a maximum of 5 unique hashtags per caption in both frontend and backend validation.
-- Tab-1 social read APIs (`GET /api/v1/social/posts`, `GET /api/v1/social/posts/{postId}`) now hydrate `authorBio` from `auth.users.bio` so feed/header metadata reflects current profile bio.
+- Tab-1 social read APIs (`GET /api/v1/social/posts`, `GET /api/v1/social/users/{userId}/posts`, `GET /api/v1/social/posts/{postId}`) hydrate `authorBio` from `auth.users.bio` so feed/header metadata reflects current profile bio.
 - Tab-1 backend now enforces one comment per user per post: repeated comment submissions update the existing comment instead of creating duplicates.
 - Tab-1 media hydration now resolves S3-backed media into signed read URLs when needed, and media public base URL handling auto-normalizes missing schemes to keep feed images renderable.
 - Frontend now has a dedicated auth module (`src/modules/auth/`) with SecureStore-backed token persistence, login/register/pending-approval screens, admin approvals UI, profile editing screen, and route guards across auth/tabs/admin groups.
@@ -52,7 +58,7 @@ Core features: NITR email verification (@nitrkl.ac.in), AI-powered peer matching
 - **Target Platform**: Android (Primary targeted platform. Code must be optimized for Android APK/AAB distribution, strictly avoiding Web-only DOM APIs).
 - **Styling**: NativeWind (Tailwind CSS for React Native)
 - **Media Selection**: expo-image-picker
-- **Video Playback**: expo-av
+- **Video Playback**: expo-video
 - **Date Selection**: @react-native-community/datetimepicker
 - **State Management**: Zustand (isolated stores per module)
 - **Navigation**: Expo Router file-based routing
@@ -96,11 +102,12 @@ Each module contains:
 - `tier_thresholds` - Point requirements for tiers
 
 ### Social Tables (Hype Feed)
-- `posts` - User posts (caption, author, visibility metadata)
+- `posts` - User posts (caption, author reference, `visibility` setting for public/followers/connections)
 - `post_media` - Photo/video attachments for posts (S3 key, media type, order)
 - `post_hypes` - Likes/hypes on posts
 - `comments` - Comments on posts
 - `hashtags` - Hashtag tracking
+- `follows` - User followers/following relationships
 
 ### Campus Tables (Tab 2: Q&A + Lost & Found with Sub-tabs)
 - `lost_found_items` - Lost & Found posts (with visibility_gender for sub-tab filtering)
@@ -160,7 +167,8 @@ app/
 │   ├── hype/
 │   │   ├── index.tsx (Feed)
 │   │   ├── create.tsx (Create post)
-│   │   ├── profile.tsx (Profile editor)
+│   │   ├── profile.tsx (Profile view + posts + edit-profile CTA)
+│   │   ├── edit-profile.tsx (Profile editor)
 │   │   └── [postId].tsx (Post detail)
 │   ├── campus/
 │   │   ├── index.tsx (Q&A + Lost&Found with Boys/Girls/General sub-tabs)
@@ -212,7 +220,9 @@ app/
 ### Tab-1 Social Endpoints (Implemented)
 - `GET /api/v1/social/health`
 - `GET /api/v1/social/posts?limit=&cursor=&hashtag=`
+- `GET /api/v1/social/users/{userId}/posts?limit=&cursor=`
 - `GET /api/v1/social/posts/{postId}`
+- `DELETE /api/v1/social/posts/{postId}`
 - `POST /api/v1/social/posts`
 - `POST /api/v1/social/posts/{postId}/hypes`
 - `POST /api/v1/social/posts/{postId}/comments`
@@ -247,6 +257,7 @@ app/
 - **Social Feed Pagination**: Cursor pagination implemented in backend (`nextCursor`) using `(created_at, id)` ordering for deterministic page boundaries
 - **Hashtag Indexing**: Captions are parsed server-side and persisted in `social.hashtags` + `social.post_hashtags` for feed filtering and trending queries
 - **Hype/Comment Mutations**: Backend performs server-side validation, optimistic-friendly mutation responses, and proper author attribution from auth claims/dev headers
+- **Delete Post Resilience**: Profile post delete uses primary `DELETE /api/v1/social/posts/{postId}` and supports compatibility fallback through `POST /api/v1/social/posts` with `{ action: "delete", postId }` when API Gateway DELETE routing is not yet configured.
 - **WebSocket**: Daily Quest chat uses AppSync subscriptions for real-time messages, presence, and typing indicators
 - **Error Handling**: Each module has isolated error boundaries; tab crashes don't affect other tabs
 - **Observability Logging**: Root layout installs a global JS error handler; all major catch paths in auth/hype frontend and Tab-1 backend now emit structured logs with file-level context, request metadata (requestId/method/path), and serialized error details.

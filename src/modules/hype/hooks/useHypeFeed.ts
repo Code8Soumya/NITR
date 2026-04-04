@@ -7,6 +7,7 @@ export function useHypeFeed() {
   const isLoading = useHypeStore((state) => state.isLoading);
   const isRefreshing = useHypeStore((state) => state.isRefreshing);
   const hasLoaded = useHypeStore((state) => state.hasLoaded);
+  const videoAudioMode = useHypeStore((state) => state.videoAudioMode);
   const activeHashtag = useHypeStore((state) => state.activeHashtag);
   const error = useHypeStore((state) => state.error);
   const loadFeed = useHypeStore((state) => state.loadFeed);
@@ -45,6 +46,7 @@ export function useHypeFeed() {
     visiblePosts,
     isLoading,
     isRefreshing,
+    videoAudioMode,
     activeHashtag,
     trendingHashtags,
     error,

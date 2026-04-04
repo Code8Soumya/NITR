@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { ResizeMode, Video } from "expo-av";
+import { useEffect, useMemo, useState } from "react";
+import { VideoView, useVideoPlayer } from "expo-video";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import {
@@ -77,6 +77,21 @@ export function CreatePostScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
   const captionHashtagCount = useMemo(() => countUniqueHashtags(caption), [caption]);
+  const selectedVideoUri = selectedMedia?.mediaType === "video" ? selectedMedia.uri : null;
+  const selectedVideoPlayer = useVideoPlayer(selectedVideoUri, (player) => {
+    player.loop = true;
+    player.muted = true;
+  });
+
+  useEffect(() => {
+    if (!selectedVideoUri) {
+      selectedVideoPlayer.pause();
+      return;
+    }
+
+    selectedVideoPlayer.muted = true;
+    selectedVideoPlayer.play();
+  }, [selectedVideoPlayer, selectedVideoUri]);
 
   const ensureMediaLibraryPermission = async (): Promise<boolean> => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -100,7 +115,7 @@ export function CreatePostScreen() {
       const [cropWidth, cropHeight] = getAspectRatioDimensionsFromLabel(selectedPhotoCropRatio);
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ["images"],
         allowsEditing: true,
         aspect: [cropWidth, cropHeight],
         quality: 1
@@ -156,7 +171,7 @@ export function CreatePostScreen() {
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+        mediaTypes: ["videos"],
         allowsEditing: false,
         quality: 1
       });
@@ -364,15 +379,19 @@ export function CreatePostScreen() {
                       resizeMode="contain"
                     />
                   ) : (
-                    <Video
-                      source={{ uri: selectedMedia.uri }}
+                    <View
                       className="mt-3 w-full overflow-hidden rounded-lg bg-slate-100"
                       style={{ aspectRatio: selectedMedia.aspectRatio }}
-                      resizeMode={ResizeMode.CONTAIN}
-                      shouldPlay
-                      isMuted
-                      isLooping
-                    />
+                    >
+                      <VideoView
+                        player={selectedVideoPlayer}
+                        className="h-full w-full"
+                        contentFit="contain"
+                        nativeControls={false}
+                        surfaceType="textureView"
+                        useExoShutter={false}
+                      />
+                    </View>
                   )}
 
                   <Text className="mt-2 text-xs text-slate-500" numberOfLines={1}>

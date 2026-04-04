@@ -9,7 +9,7 @@ type HashtagRailProps = {
 export function HashtagRail({ activeHashtag, hashtags, onSelect }: HashtagRailProps) {
   return (
     <View>
-      <Text className="mb-2 mt-3 text-sm font-semibold uppercase tracking-wider text-slate-500">
+      <Text className="mb-2 mt-0 text-sm font-semibold uppercase tracking-wider text-slate-500">
         Trending tags
       </Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false}>

@@ -7,7 +7,7 @@ export default function QuestPlaceholderScreen() {
       <View className="mx-5 mt-10 rounded-2xl bg-white p-5" style={{ elevation: 2 }}>
         <Text className="text-2xl font-bold text-slate-900">Daily Quest</Text>
         <Text className="mt-2 text-base text-slate-600">
-          Tab-3 placeholder. 1-on-1 quest chat can be implemented independently later.
+          Tab-3 placeholder. This screen remains isolated while Tab-1 is being built.
         </Text>
       </View>
     </SafeAreaView>

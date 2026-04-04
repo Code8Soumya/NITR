@@ -26,16 +26,18 @@ const cognitoMaxAttempts =
 let cognitoClient;
 
 const ensureConfig = () => {
-  if (!otpToggle) {
-    throw new HttpError(400, "Cognito OTP is disabled", "COGNITO_OTP_DISABLED");
-  }
-
   if (!cognitoRegion || !cognitoClientId) {
     throw new HttpError(
       500,
       "COGNITO_REGION and COGNITO_USER_POOL_CLIENT_ID must be configured",
       "COGNITO_CONFIG_MISSING"
     );
+  }
+};
+
+const ensureOtpEnabled = () => {
+  if (!otpToggle) {
+    throw new HttpError(400, "Cognito OTP is disabled", "COGNITO_OTP_DISABLED");
   }
 };
 
@@ -331,8 +333,12 @@ export const resendCognitoOtp = async ({ email }) => {
   }
 };
 
-export const updateCognitoProfile = async ({ email, name, nickname }) => {
-  if (!otpToggle) {
+export const updateCognitoProfile = async ({ email, name, nickname, username }) => {
+  if (!cognitoUserPoolId) {
+    logWarn({
+      message: "COGNITO_USER_POOL_ID not configured. Skipping Cognito profile sync.",
+      email
+    });
     return { synced: false };
   }
 
@@ -344,7 +350,7 @@ export const updateCognitoProfile = async ({ email, name, nickname }) => {
     await client.send(
       new AdminUpdateUserAttributesCommand({
         UserPoolId: cognitoUserPoolId,
-        Username: email,
+        Username: username || email,
         UserAttributes: [
           {
             Name: "name",

@@ -1,0 +1,29 @@
+python3 .github\prompts\ui-ux-pro-max\scripts\search.py "social media education campus student modern mobile" --design-system --persist -p "NITR Hub" --stack react-native
+
+python3 .github\prompts\ui-ux-pro-max\scripts\search.py "accessibility onboarding" --domain ux
+
+python3 .github\prompts\ui-ux-pro-max\scripts\search.py "youthful readable" --domain typography
+
+python3 .github\prompts\ui-ux-pro-max\scripts\search.py "campus student" --domain color
+
+python3 .github\prompts\ui-ux-pro-max\scripts\search.py "navigation list performance" --stack react-native
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

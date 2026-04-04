@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "expo-router";
 import { Animated, ScrollView, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -9,7 +8,7 @@ import { AnimatedPressable } from "@/shared/components/AnimatedPressable";
 const nicknameRegex = /^[a-z0-9._-]{3,30}$/;
 
 export function ProfileScreen() {
-  const { user, busy, error, clearError, updateProfile, logout } = useAuth();
+  const { user, busy, error, clearError, updateProfile } = useAuth();
 
   const initialName = useMemo(() => user?.name ?? "", [user?.name]);
   const initialNickname = useMemo(() => user?.nickname ?? "", [user?.nickname]);
@@ -61,7 +60,7 @@ export function ProfileScreen() {
 
     if (!nicknameRegex.test(trimmedNickname)) {
       setValidationError(
-        "Nickname must be 3-30 chars with lowercase letters, numbers, dot, dash, underscore."
+        "Username must be 3-30 chars with lowercase letters, numbers, dot, dash, underscore."
       );
       return;
     }
@@ -97,48 +96,57 @@ export function ProfileScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-amber-50 px-5 py-6">
-      <ScrollView contentContainerStyle={{ paddingBottom: 24 }} showsVerticalScrollIndicator={false}>
-        <View className="rounded-3xl border border-amber-200 bg-white p-5">
-          <Text className="text-2xl font-black text-stone-900">My Profile</Text>
-          <Text className="mt-1 text-sm text-stone-700">@{nickname || user.nickname}</Text>
+      <ScrollView contentContainerStyle={{ paddingBottom: 24, paddingTop: 12 }} showsVerticalScrollIndicator={false}>
+        <View className="items-center mb-6">
+          <View className="h-24 w-24 rounded-full bg-rose-100 items-center justify-center border-4 border-white shadow-sm">
+            <Text className="text-3xl font-bold text-rose-600">
+              {(name || user.name || "N")[0].toUpperCase()}
+            </Text>
+          </View>
+          <Text className="mt-3 text-2xl font-black text-stone-900">{name || user.name}</Text>
+          <Text className="mt-1 text-sm font-medium text-stone-500">@{nickname || user.nickname}</Text>
+        </View>
 
-          <View className="mt-4">
-            <Text className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-600">Name</Text>
+        <View className="rounded-3xl border border-amber-200 bg-white p-6 shadow-sm mb-4">
+          <Text className="text-lg font-bold text-stone-800 mb-4">Edit Profile</Text>
+
+          <View className="mt-2">
+            <Text className="mb-2 text-xs font-semibold uppercase tracking-wider text-stone-500">Full Name</Text>
             <TextInput
               value={name}
               onChangeText={setName}
               placeholder="Your full name"
-              placeholderTextColor="#78716c"
-              className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-base text-stone-900"
+              placeholderTextColor="#a8a29e"
+              className="rounded-xl bg-stone-50 px-4 py-3 text-base text-stone-900 border border-stone-200 focus:border-rose-400 focus:bg-white"
             />
           </View>
 
-          <View className="mt-4">
-            <Text className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-600">Nickname</Text>
+          <View className="mt-5">
+            <Text className="mb-2 text-xs font-semibold uppercase tracking-wider text-stone-500">Username</Text>
             <TextInput
               autoCapitalize="none"
               autoCorrect={false}
               value={nickname}
               onChangeText={setNickname}
-              placeholder="username_for_app"
-              placeholderTextColor="#78716c"
-              className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-base text-stone-900"
+              placeholder="username"
+              placeholderTextColor="#a8a29e"
+              className="rounded-xl bg-stone-50 px-4 py-3 text-base text-stone-900 border border-stone-200 focus:border-rose-400 focus:bg-white"
             />
           </View>
 
-          <View className="mt-4">
-            <Text className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-600">Branch</Text>
+          <View className="mt-5">
+            <Text className="mb-2 text-xs font-semibold uppercase tracking-wider text-stone-500">Branch</Text>
             <TextInput
               value={branch}
               onChangeText={setBranch}
               placeholder="CSE"
-              placeholderTextColor="#78716c"
-              className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-base text-stone-900"
+              placeholderTextColor="#a8a29e"
+              className="rounded-xl bg-stone-50 px-4 py-3 text-base text-stone-900 border border-stone-200 focus:border-rose-400 focus:bg-white"
             />
           </View>
 
-          <View className="mt-4">
-            <Text className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-600">Bio</Text>
+          <View className="mt-5">
+            <Text className="mb-2 text-xs font-semibold uppercase tracking-wider text-stone-500">Bio</Text>
             <TextInput
               multiline
               numberOfLines={4}
@@ -146,38 +154,50 @@ export function ProfileScreen() {
               value={bio}
               onChangeText={setBio}
               placeholder="Add your bio"
-              placeholderTextColor="#78716c"
-              className="min-h-[96px] rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-base text-stone-900"
+              placeholderTextColor="#a8a29e"
+              className="min-h-[100px] rounded-xl bg-stone-50 px-4 py-3 text-base text-stone-900 border border-stone-200 focus:border-rose-400 focus:bg-white"
             />
           </View>
 
-          <View className="mt-4">
-            <Text className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-600">
-              Interests (comma separated)
+          <View className="mt-5">
+            <Text className="mb-2 text-xs font-semibold uppercase tracking-wider text-stone-500">
+              Interests
             </Text>
             <TextInput
               value={interestsText}
               onChangeText={setInterestsText}
               placeholder="coding, football, music"
-              placeholderTextColor="#78716c"
-              className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-base text-stone-900"
+              placeholderTextColor="#a8a29e"
+              className="rounded-xl bg-stone-50 px-4 py-3 text-base text-stone-900 border border-stone-200 focus:border-rose-400 focus:bg-white"
             />
+            <Text className="mt-1.5 text-[11px] text-stone-400">Separate multiple interests with commas</Text>
           </View>
+        </View>
 
-          <View className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4">
-            <Text className="text-xs font-semibold uppercase tracking-wide text-stone-600">
-              Locked fields
-            </Text>
-            <Text className="mt-2 text-sm text-stone-700">Email: {user.email}</Text>
-            <Text className="mt-1 text-sm text-stone-700">Gender: {user.gender}</Text>
-            <Text className="mt-1 text-sm text-stone-700">Birth date: {user.birthDate}</Text>
+        <View className="rounded-3xl border border-stone-200 bg-stone-100 p-6 shadow-sm mb-6">
+          <Text className="text-xs font-bold uppercase tracking-wider text-stone-500 mb-3">
+            Account Details (Locked)
+          </Text>
+          <View className="flex-row justify-between py-2 border-b border-stone-200/60">
+            <Text className="text-sm font-medium text-stone-500">Email</Text>
+            <Text className="text-sm font-semibold text-stone-800">{user.email}</Text>
           </View>
+          <View className="flex-row justify-between py-2 border-b border-stone-200/60">
+            <Text className="text-sm font-medium text-stone-500">Gender</Text>
+            <Text className="text-sm font-semibold text-stone-800 capitalize">{user.gender}</Text>
+          </View>
+          <View className="flex-row justify-between py-2">
+            <Text className="text-sm font-medium text-stone-500">Birth Date</Text>
+            <Text className="text-sm font-semibold text-stone-800">{user.birthDate}</Text>
+          </View>
+        </View>
 
-          {validationError ? <Text className="mt-3 text-sm text-red-700">{validationError}</Text> : null}
+        <View className="px-1">
+          {validationError ? <Text className="mb-4 text-sm text-rose-600 font-medium text-center">{validationError}</Text> : null}
 
           {info ? (
             <Animated.View
-              className="mt-3 rounded-xl bg-emerald-100 px-3 py-2"
+              className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 shadow-sm"
               style={{
                 opacity: infoAnim,
                 transform: [
@@ -190,40 +210,20 @@ export function ProfileScreen() {
                 ]
               }}
             >
-              <Text className="text-sm font-medium text-emerald-700">{info}</Text>
+              <Text className="text-center text-sm font-semibold text-emerald-700">{info}</Text>
             </Animated.View>
           ) : null}
-          {error ? <Text className="mt-3 text-sm text-red-700">{error}</Text> : null}
+          {error ? <Text className="mb-4 text-center text-sm font-medium text-rose-600">{error}</Text> : null}
 
           <AnimatedPressable
             disabled={busy}
             onPress={onSave}
-            className="mt-4 rounded-2xl bg-rose-600 px-4 py-3"
+            className="rounded-xl bg-stone-900 px-4 py-3.5 shadow-sm active:bg-stone-800"
           >
-            <Text className="text-center text-base font-bold text-white">
-              {busy ? "Saving..." : "Save profile"}
+            <Text className="text-center text-[15px] font-bold text-white tracking-wide">
+              {busy ? "Saving..." : "Save Profile"}
             </Text>
           </AnimatedPressable>
-
-          <AnimatedPressable
-            disabled={busy}
-            onPress={logout}
-            className="mt-3 rounded-2xl border border-stone-300 bg-white px-4 py-3"
-          >
-            <Text className="text-center text-base font-semibold text-stone-700">Sign out</Text>
-          </AnimatedPressable>
-
-          {user.isAdmin && (
-            <Link href={"/(admin)/approvals" as never} asChild>
-              <AnimatedPressable
-                className="mt-6 rounded-2xl bg-stone-800 px-4 py-3"
-              >
-                <Text className="text-center text-base font-bold text-white">
-                  Admin Dashboard
-                </Text>
-              </AnimatedPressable>
-            </Link>
-          )}
         </View>
       </ScrollView>
     </SafeAreaView>

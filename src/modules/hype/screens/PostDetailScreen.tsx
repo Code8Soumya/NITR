@@ -13,6 +13,7 @@ export function PostDetailScreen() {
   const { postId } = useLocalSearchParams<{ postId: string }>();
   const { user } = useAuth();
   const posts = useHypeStore((state) => state.posts);
+  const videoAudioMode = useHypeStore((state) => state.videoAudioMode);
   const { toggleHype, addComment } = useHypeActions();
 
   const [comment, setComment] = useState("");
@@ -51,6 +52,7 @@ export function PostDetailScreen() {
           post={post}
           onOpen={() => {}}
           onToggleHype={() => void toggleHype(post.id)}
+          videoAudioMode={videoAudioMode}
         />
 
         <View className="rounded-2xl bg-white p-4" style={{ elevation: 2 }}>
