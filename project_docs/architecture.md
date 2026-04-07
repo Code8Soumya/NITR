@@ -1,6 +1,6 @@
 # Architecture Documentation
 
-**Last Updated**: 2026-04-04
+**Last Updated**: 2026-04-07
 
 ## Application Overview
 
@@ -21,6 +21,7 @@ Core features: NITR email verification (@nitrkl.ac.in), AI-powered peer matching
 
 ## Implementation Status (Current)
 
+- Memory Bank and Logic Mapping System is deployed automatically tracking full-stack connections to `logic_bridges.md` via `scripts/watch-bridges.js`.
 - Frontend scaffold is initialized with Expo Router + TypeScript + NativeWind.
 - Tab-1 (Hype Feed) is implemented as an isolated module under `src/modules/hype/`.
 - Tab-1 backend is implemented under `backend/tab1-social/` with AWS Lambda-compatible handlers, Aurora SQL repository layer, and S3 pre-signed upload support.

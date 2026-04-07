@@ -1,6 +1,6 @@
 # File Index
 
-**Last Updated**: 2026-04-04
+**Last Updated**: 2026-04-07
 
 This document maps the project directory structure and describes key files. Update this file whenever you create, delete, or significantly modify files.
 
@@ -35,8 +35,15 @@ NITR/
 |     |- campus/
 |     |  '- index.tsx                  # Tab-2 placeholder screen
 |     '- quest/
-|        '- index.tsx                  # Tab-3 placeholder screen
-|- src/
+|        '- index.tsx                  # Tab-3 placeholder screen|- scripts/
+|  |- generate-bridges.js              # Parses routes, API calls, lambdas, and DB repositories to build logic map
+|  '- watch-bridges.js                 # Watches code files and dynamically re-runs generate-bridges.js
+|- project_docs/
+|  |- active_context.md                # Tracks current tasks, bugs, and recent PRs
+|  |- architecture.md                  # Core tech stack and isolated module structural overview
+|  |- database_design.md               # PostgreSQL schema structure, constraints, and relationships
+|  |- file_index.md                    # This file (directory map and file responsibilities)
+|  '- logic_bridges.md                 # Auto-generated routing map bridging UI → Zustand → APIs → Lambdas → DB|- src/
 |  |- modules/
 |  |  '- auth/                         # Auth + admin-approval isolated module
 |  |     |- api/

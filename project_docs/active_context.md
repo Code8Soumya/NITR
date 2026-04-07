@@ -1,6 +1,6 @@
 # Active Context
 
-**Last Updated**: 2026-04-04
+**Last Updated**: 2026-04-07
 
 This document tracks the current task, recent changes, known bugs, and next steps. Update this file whenever you complete a feature, pivot tasks, or discover persistent issues.
 
@@ -18,6 +18,19 @@ This document tracks the current task, recent changes, known bugs, and next step
 - [x] Updated API contract/setup docs and memory-bank docs with delete-route requirements and compatibility behavior.
 
 ## Recent Changes
+
+### 2026-04-07
+
+- **Added Memory Bank & Logic Mapping System**
+  - Requirement covered:
+    - Eliminate hallucination risks by mapping UI Screens → Zustand State → Network APIs → Lambda Endpoints → Aurora DB automatically.
+  - Core changes:
+    - Created `scripts/generate-bridges.js` and `scripts/watch-bridges.js` to parse code and generate a logic map.
+    - Updated `package.json` with `generate:bridges` and `watch:bridges` scripts.
+    - Generated `project_docs/logic_bridges.md` as the primary source of truth for all cross-stack connections.
+    - Updated `.github/copilot-instructions.md` to establish the new Memory Bank + Logic Bridges rules.
+    - Added `.github/instructions/bridge-map.instructions.md` to auto-trigger bridge map review on API/state edits.
+  - Status: [DONE]
 
 ### 2026-04-04
 

@@ -7,7 +7,9 @@
     "start": "expo start",
     "android": "expo run:android",
     "lint": "expo lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "generate:bridges": "node scripts/generate-bridges.js",
+    "watch:bridges": "node scripts/watch-bridges.js"
   },
   "dependencies": {
     "@react-native-community/datetimepicker": "8.4.4",
