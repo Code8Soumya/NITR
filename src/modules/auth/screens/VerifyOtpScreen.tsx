@@ -85,17 +85,17 @@ export function VerifyOtpScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-amber-50 px-5 py-6">
+    <SafeAreaView className="flex-1 bg-background px-5 py-6">
       <View className="mb-8 mt-6">
-        <Text className="text-3xl font-black text-stone-900">Verify OTP</Text>
-        <Text className="mt-2 text-base text-stone-700">
+        <Text className="text-3xl font-black text-text">Verify OTP</Text>
+        <Text className="mt-2 text-base text-text/80">
           Enter the OTP code sent by Cognito to your NITR email.
         </Text>
       </View>
 
-      <View className="gap-4 rounded-3xl border border-amber-200 bg-white p-5">
+      <View className="gap-4 rounded-3xl border border-amber-200 bg-background p-5">
         <View>
-          <Text className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-600">Email</Text>
+          <Text className="mb-2 text-xs font-semibold uppercase tracking-wide text-text/80">Email</Text>
           <TextInput
             autoCapitalize="none"
             autoCorrect={false}
@@ -104,12 +104,12 @@ export function VerifyOtpScreen() {
             onChangeText={setEmail}
             placeholder="yourid@nitrkl.ac.in"
             placeholderTextColor="#78716c"
-            className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-base text-stone-900"
+            className="rounded-2xl border border-amber-200 bg-background px-4 py-3 text-base text-text"
           />
         </View>
 
         <View>
-          <Text className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-600">OTP code</Text>
+          <Text className="mb-2 text-xs font-semibold uppercase tracking-wide text-text/80">OTP code</Text>
           <TextInput
             autoCapitalize="none"
             autoCorrect={false}
@@ -118,19 +118,19 @@ export function VerifyOtpScreen() {
             onChangeText={setCode}
             placeholder="6-digit code"
             placeholderTextColor="#78716c"
-            className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-base text-stone-900"
+            className="rounded-2xl border border-amber-200 bg-background px-4 py-3 text-base text-text"
           />
         </View>
 
         {info ? <Text className="text-sm text-emerald-700">{info}</Text> : null}
-        {error ? <Text className="text-sm text-red-700">{error}</Text> : null}
+        {error ? <Text className="text-sm text-primary">{error}</Text> : null}
 
         <AnimatedPressable
           disabled={busy}
           onPress={verifyOtp}
-          className="rounded-2xl bg-rose-600 px-4 py-3"
+          className="rounded-2xl btn-primary bg-cta px-4 py-3 cursor-pointer"
         >
-          <Text className="text-center text-base font-bold text-white">
+          <Text className="text-center text-base font-bold font-heading text-white">
             {busy ? "Verifying..." : "Verify OTP"}
           </Text>
         </AnimatedPressable>
@@ -138,15 +138,15 @@ export function VerifyOtpScreen() {
         <AnimatedPressable
           disabled={busy}
           onPress={resendOtp}
-          className="rounded-2xl border border-stone-300 bg-white px-4 py-3"
+          className="rounded-2xl border border-gray-200 bg-background px-4 py-3 cursor-pointer"
         >
-          <Text className="text-center text-base font-semibold text-stone-700">Resend OTP</Text>
+          <Text className="text-center text-base font-semibold text-text/80">Resend OTP</Text>
         </AnimatedPressable>
       </View>
 
       <View className="mt-5 flex-row justify-center gap-2">
-        <Text className="text-stone-700">Already verified?</Text>
-        <Link href={"/(auth)/login" as never} className="font-semibold text-rose-700">
+        <Text className="text-text/80">Already verified?</Text>
+        <Link href={"/(auth)/login" as never} className="font-semibold text-primary">
           Sign in
         </Link>
       </View>

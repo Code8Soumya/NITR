@@ -65,7 +65,7 @@ export function HypeFeedScreen() {
         className="h-10 w-10 items-center justify-center rounded-full bg-slate-100"
         android_ripple={{ color: "#e2e8f0" }}
       >
-        <Text className="text-lg">
+        <Text className="text-lg font-body text-text">
           {videoAudioMode === "start-unmuted" ? "🔊" : videoAudioMode === "start-muted" ? "🔈" : "🔇"}
         </Text>
       </Pressable>
@@ -75,15 +75,15 @@ export function HypeFeedScreen() {
         className="h-10 w-10 items-center justify-center rounded-full bg-rose-100"
         android_ripple={{ color: "#fecdd3" }}
       >
-        <Text className="text-xl font-bold text-rose-600">+</Text>
+        <Text className="text-xl font-heading text-text font-bold font-heading text-primary">+</Text>
       </Pressable>
 
       <Pressable
         onPress={openOverflowMenu}
-        className="h-10 w-10 items-center justify-center rounded-full bg-slate-100"
+        className="h-10 w-10 items-center justify-center rounded-full bg-slate-100 cursor-pointer"
         android_ripple={{ color: "#e2e8f0" }}
       >
-        <Text className="text-xl font-bold text-slate-700">⋮</Text>
+        <Text className="text-xl font-heading text-text font-bold font-heading text-slate-700">⋮</Text>
       </Pressable>
     </View>
   );
@@ -94,7 +94,7 @@ export function HypeFeedScreen() {
       
       {/* Custom Header */}
       <View className="flex-row items-center justify-between px-4 py-2 bg-[#fffaf2]">
-        <Text className="text-2xl font-extrabold text-rose-600">Hype</Text>
+        <Text className="text-2xl font-heading text-text font-extrabold text-primary">Hype</Text>
         {renderHeaderRight()}
       </View>
 
@@ -113,7 +113,7 @@ export function HypeFeedScreen() {
               onSelect={setActiveHashtag}
             />
 
-            {error ? <Text className="mt-3 text-sm text-rose-700">{error}</Text> : null}
+            {error ? <Text className="mt-3 text-sm text-primary">{error}</Text> : null}
             {isLoading ? <Text className="mt-3 text-sm text-slate-500">Loading feed...</Text> : null}
           </View>
         }

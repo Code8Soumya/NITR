@@ -291,7 +291,7 @@ export function CreatePostScreen() {
             Add text and one photo or video from your gallery. Allowed ratios: {allowedAspectLabelText}.
           </Text>
 
-          <View className="mt-6 rounded-2xl bg-white p-4" style={{ elevation: 2 }}>
+          <View className="mt-6 rounded-2xl bg-background p-4" style={{ elevation: 2 }}>
             <Text className="text-sm font-semibold text-slate-700">Caption</Text>
             <TextInput
               className="mt-2 min-h-28 rounded-xl border border-slate-300 px-4 py-3 text-base text-slate-900"
@@ -303,7 +303,7 @@ export function CreatePostScreen() {
             />
             <Text
               className={`mt-2 text-xs ${
-                captionHashtagCount > MAX_HASHTAGS_PER_POST ? "text-rose-700" : "text-slate-500"
+                captionHashtagCount > MAX_HASHTAGS_PER_POST ? "text-primary" : "text-slate-500"
               }`}
             >
               Hashtags: {captionHashtagCount}/{MAX_HASHTAGS_PER_POST}
@@ -340,7 +340,7 @@ export function CreatePostScreen() {
 
               <View className="mt-3 flex-row">
                 <Pressable
-                  className="flex-1 rounded-lg bg-slate-800 px-4 py-3"
+                  className="flex-1 rounded-lg bg-slate-800 px-4 py-3 cursor-pointer"
                   android_ripple={{ color: "#1e293b" }}
                   onPress={() => void pickPhoto()}
                 >
@@ -348,7 +348,7 @@ export function CreatePostScreen() {
                 </Pressable>
 
                 <Pressable
-                  className="ml-2 flex-1 rounded-lg bg-slate-700 px-4 py-3"
+                  className="ml-2 flex-1 rounded-lg bg-slate-700 px-4 py-3 cursor-pointer"
                   android_ripple={{ color: "#334155" }}
                   onPress={() => void pickVideo()}
                 >
@@ -399,7 +399,7 @@ export function CreatePostScreen() {
                   </Text>
 
                   <Pressable
-                    className="mt-3 rounded-lg bg-slate-200 px-4 py-3"
+                    className="mt-3 rounded-lg bg-slate-200 px-4 py-3 cursor-pointer"
                     android_ripple={{ color: "#cbd5e1" }}
                     onPress={() => setSelectedMedia(undefined)}
                   >
@@ -413,10 +413,10 @@ export function CreatePostScreen() {
               )}
             </View>
 
-            {error ? <Text className="mt-4 text-sm text-rose-700">{error}</Text> : null}
+            {error ? <Text className="mt-4 text-sm text-primary">{error}</Text> : null}
 
             <Pressable
-              className={`mt-5 rounded-xl px-4 py-3 ${isSubmitting ? "bg-rose-300" : "bg-rose-600"}`}
+              className={`mt-5 rounded-xl px-4 py-3 ${isSubmitting ? "bg-rose-300" : "btn-primary bg-cta"}`}
               android_ripple={{ color: "#be123c" }}
               disabled={isSubmitting}
               onPress={() => void publishPost()}

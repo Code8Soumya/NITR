@@ -239,22 +239,22 @@ export function PostCard({
 
   return (
     <Pressable
-      className="mb-4 overflow-hidden rounded-2xl bg-white"
+      className="mb-4 overflow-hidden rounded-2xl bg-background cursor-pointer"
       style={{ elevation: 2 }}
       android_ripple={{ color: "#fdf2f8" }}
       onPress={onOpen}
     >
       <View className="flex-row items-center justify-between px-4 pt-4">
         <View className="flex-1 pr-3">
-          <Text className="text-base font-bold text-slate-900">{post.authorName}</Text>
+          <Text className="text-base font-bold font-heading text-slate-900">{post.authorName}</Text>
           <Text className="text-xs text-slate-500">{post.authorBranch} · {timeAgo(post.createdAt)}</Text>
           <Text className="mt-1 text-xs text-slate-500" numberOfLines={1}>
             {authorBioPreview}
           </Text>
         </View>
         {onDelete ? (
-          <Pressable onPress={onDelete} className="rounded-full bg-rose-100 px-3 py-1">
-            <Text className="text-xs font-bold text-rose-600">DELETE</Text>
+          <Pressable onPress={onDelete} className="rounded-full bg-rose-100 px-3 py-1 cursor-pointer">
+            <Text className="text-xs font-bold font-heading text-primary">DELETE</Text>
           </Pressable>
         ) : firstMedia ? (
           <View className="rounded-full bg-slate-100 px-3 py-1">
@@ -316,7 +316,7 @@ export function PostCard({
             </Pressable>
 
             <Pressable
-              className="ml-2 rounded-full bg-black/70 px-3 py-1"
+              className="ml-2 rounded-full bg-black/70 px-3 py-1 cursor-pointer"
               android_ripple={{ color: "#334155" }}
               onPress={(event) => {
                 event.stopPropagation();
@@ -352,7 +352,7 @@ export function PostCard({
 
         <View className="mt-4 flex-row items-center justify-between border-t border-slate-100 pt-3">
         <Pressable
-          className={`rounded-full px-4 py-2 ${post.isHypedByMe ? "bg-rose-600" : "bg-slate-100"}`}
+          className={`rounded-full px-4 py-2 ${post.isHypedByMe ? "btn-primary bg-cta" : "bg-slate-100"}`}
           android_ripple={{ color: "#fecdd3" }}
           onPress={(event) => {
             event.stopPropagation();

@@ -16,7 +16,7 @@ export function HashtagRail({ activeHashtag, hashtags, onSelect }: HashtagRailPr
         <View className="flex-row gap-2 pb-2">
           <Pressable
             className={`rounded-full border px-4 py-2 ${
-              !activeHashtag ? "border-rose-600 bg-rose-600" : "border-slate-300 bg-white"
+              !activeHashtag ? "border-primary btn-primary bg-cta" : "border-slate-300 bg-background"
             }`}
             android_ripple={{ color: "#fecdd3" }}
             onPress={() => onSelect(undefined)}
@@ -29,8 +29,8 @@ export function HashtagRail({ activeHashtag, hashtags, onSelect }: HashtagRailPr
               key={item.tag}
               className={`rounded-full border px-4 py-2 ${
                 activeHashtag === item.tag
-                  ? "border-rose-600 bg-rose-600"
-                  : "border-slate-300 bg-white"
+                  ? "border-primary btn-primary bg-cta"
+                  : "border-slate-300 bg-background"
               }`}
               android_ripple={{ color: "#fecdd3" }}
               onPress={() => onSelect(item.tag)}

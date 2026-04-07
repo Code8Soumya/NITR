@@ -88,41 +88,41 @@ export function ProfileScreen() {
 
   if (!user) {
     return (
-      <SafeAreaView className="flex-1 items-center justify-center bg-amber-50 px-6">
-        <Text className="text-base text-stone-700">Profile unavailable. Please login again.</Text>
+      <SafeAreaView className="flex-1 items-center justify-center bg-background px-6">
+        <Text className="text-base text-text/80">Profile unavailable. Please login again.</Text>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-amber-50 px-5 py-6">
+    <SafeAreaView className="flex-1 bg-background px-5 py-6">
       <ScrollView contentContainerStyle={{ paddingBottom: 24, paddingTop: 12 }} showsVerticalScrollIndicator={false}>
         <View className="items-center mb-6">
           <View className="h-24 w-24 rounded-full bg-rose-100 items-center justify-center border-4 border-white shadow-sm">
-            <Text className="text-3xl font-bold text-rose-600">
+            <Text className="text-3xl font-bold font-heading text-primary">
               {(name || user.name || "N")[0].toUpperCase()}
             </Text>
           </View>
-          <Text className="mt-3 text-2xl font-black text-stone-900">{name || user.name}</Text>
-          <Text className="mt-1 text-sm font-medium text-stone-500">@{nickname || user.nickname}</Text>
+          <Text className="mt-3 text-2xl font-heading text-text font-black text-text">{name || user.name}</Text>
+          <Text className="mt-1 text-sm font-medium text-text/80">@{nickname || user.nickname}</Text>
         </View>
 
-        <View className="rounded-3xl border border-amber-200 bg-white p-6 shadow-sm mb-4">
-          <Text className="text-lg font-bold text-stone-800 mb-4">Edit Profile</Text>
+        <View className="rounded-3xl border border-amber-200 bg-background p-6 shadow-sm mb-4">
+          <Text className="text-lg font-body text-text font-bold font-heading text-text/80 mb-4">Edit Profile</Text>
 
           <View className="mt-2">
-            <Text className="mb-2 text-xs font-semibold uppercase tracking-wider text-stone-500">Full Name</Text>
+            <Text className="mb-2 text-xs font-semibold uppercase tracking-wider text-text/80">Full Name</Text>
             <TextInput
               value={name}
               onChangeText={setName}
               placeholder="Your full name"
               placeholderTextColor="#a8a29e"
-              className="rounded-xl bg-stone-50 px-4 py-3 text-base text-stone-900 border border-stone-200 focus:border-rose-400 focus:bg-white"
+              className="rounded-xl bg-stone-50 px-4 py-3 text-base text-text border border-gray-200 focus:border-primary focus:bg-background"
             />
           </View>
 
           <View className="mt-5">
-            <Text className="mb-2 text-xs font-semibold uppercase tracking-wider text-stone-500">Username</Text>
+            <Text className="mb-2 text-xs font-semibold uppercase tracking-wider text-text/80">Username</Text>
             <TextInput
               autoCapitalize="none"
               autoCorrect={false}
@@ -130,23 +130,23 @@ export function ProfileScreen() {
               onChangeText={setNickname}
               placeholder="username"
               placeholderTextColor="#a8a29e"
-              className="rounded-xl bg-stone-50 px-4 py-3 text-base text-stone-900 border border-stone-200 focus:border-rose-400 focus:bg-white"
+              className="rounded-xl bg-stone-50 px-4 py-3 text-base text-text border border-gray-200 focus:border-primary focus:bg-background"
             />
           </View>
 
           <View className="mt-5">
-            <Text className="mb-2 text-xs font-semibold uppercase tracking-wider text-stone-500">Branch</Text>
+            <Text className="mb-2 text-xs font-semibold uppercase tracking-wider text-text/80">Branch</Text>
             <TextInput
               value={branch}
               onChangeText={setBranch}
               placeholder="CSE"
               placeholderTextColor="#a8a29e"
-              className="rounded-xl bg-stone-50 px-4 py-3 text-base text-stone-900 border border-stone-200 focus:border-rose-400 focus:bg-white"
+              className="rounded-xl bg-stone-50 px-4 py-3 text-base text-text border border-gray-200 focus:border-primary focus:bg-background"
             />
           </View>
 
           <View className="mt-5">
-            <Text className="mb-2 text-xs font-semibold uppercase tracking-wider text-stone-500">Bio</Text>
+            <Text className="mb-2 text-xs font-semibold uppercase tracking-wider text-text/80">Bio</Text>
             <TextInput
               multiline
               numberOfLines={4}
@@ -155,12 +155,12 @@ export function ProfileScreen() {
               onChangeText={setBio}
               placeholder="Add your bio"
               placeholderTextColor="#a8a29e"
-              className="min-h-[100px] rounded-xl bg-stone-50 px-4 py-3 text-base text-stone-900 border border-stone-200 focus:border-rose-400 focus:bg-white"
+              className="min-h-[100px] rounded-xl bg-stone-50 px-4 py-3 text-base text-text border border-gray-200 focus:border-primary focus:bg-background"
             />
           </View>
 
           <View className="mt-5">
-            <Text className="mb-2 text-xs font-semibold uppercase tracking-wider text-stone-500">
+            <Text className="mb-2 text-xs font-semibold uppercase tracking-wider text-text/80">
               Interests
             </Text>
             <TextInput
@@ -168,32 +168,32 @@ export function ProfileScreen() {
               onChangeText={setInterestsText}
               placeholder="coding, football, music"
               placeholderTextColor="#a8a29e"
-              className="rounded-xl bg-stone-50 px-4 py-3 text-base text-stone-900 border border-stone-200 focus:border-rose-400 focus:bg-white"
+              className="rounded-xl bg-stone-50 px-4 py-3 text-base text-text border border-gray-200 focus:border-primary focus:bg-background"
             />
-            <Text className="mt-1.5 text-[11px] text-stone-400">Separate multiple interests with commas</Text>
+            <Text className="mt-1.5 text-[11px] text-text/80">Separate multiple interests with commas</Text>
           </View>
         </View>
 
-        <View className="rounded-3xl border border-stone-200 bg-stone-100 p-6 shadow-sm mb-6">
-          <Text className="text-xs font-bold uppercase tracking-wider text-stone-500 mb-3">
+        <View className="rounded-3xl border border-gray-200 bg-stone-100 p-6 shadow-sm mb-6">
+          <Text className="text-xs font-bold font-heading uppercase tracking-wider text-text/80 mb-3">
             Account Details (Locked)
           </Text>
-          <View className="flex-row justify-between py-2 border-b border-stone-200/60">
-            <Text className="text-sm font-medium text-stone-500">Email</Text>
-            <Text className="text-sm font-semibold text-stone-800">{user.email}</Text>
+          <View className="flex-row justify-between py-2 border-b border-gray-200/60">
+            <Text className="text-sm font-medium text-text/80">Email</Text>
+            <Text className="text-sm font-semibold text-text/80">{user.email}</Text>
           </View>
-          <View className="flex-row justify-between py-2 border-b border-stone-200/60">
-            <Text className="text-sm font-medium text-stone-500">Gender</Text>
-            <Text className="text-sm font-semibold text-stone-800 capitalize">{user.gender}</Text>
+          <View className="flex-row justify-between py-2 border-b border-gray-200/60">
+            <Text className="text-sm font-medium text-text/80">Gender</Text>
+            <Text className="text-sm font-semibold text-text/80 capitalize">{user.gender}</Text>
           </View>
           <View className="flex-row justify-between py-2">
-            <Text className="text-sm font-medium text-stone-500">Birth Date</Text>
-            <Text className="text-sm font-semibold text-stone-800">{user.birthDate}</Text>
+            <Text className="text-sm font-medium text-text/80">Birth Date</Text>
+            <Text className="text-sm font-semibold text-text/80">{user.birthDate}</Text>
           </View>
         </View>
 
         <View className="px-1">
-          {validationError ? <Text className="mb-4 text-sm text-rose-600 font-medium text-center">{validationError}</Text> : null}
+          {validationError ? <Text className="mb-4 text-sm text-primary font-medium text-center">{validationError}</Text> : null}
 
           {info ? (
             <Animated.View
@@ -213,14 +213,14 @@ export function ProfileScreen() {
               <Text className="text-center text-sm font-semibold text-emerald-700">{info}</Text>
             </Animated.View>
           ) : null}
-          {error ? <Text className="mb-4 text-center text-sm font-medium text-rose-600">{error}</Text> : null}
+          {error ? <Text className="mb-4 text-center text-sm font-medium text-primary">{error}</Text> : null}
 
           <AnimatedPressable
             disabled={busy}
             onPress={onSave}
-            className="rounded-xl bg-stone-900 px-4 py-3.5 shadow-sm active:bg-stone-800"
+            className="rounded-xl bg-stone-900 px-4 py-3.5 shadow-sm active:bg-stone-800 cursor-pointer"
           >
-            <Text className="text-center text-[15px] font-bold text-white tracking-wide">
+            <Text className="text-center text-[15px] font-bold font-heading text-white tracking-wide">
               {busy ? "Saving..." : "Save Profile"}
             </Text>
           </AnimatedPressable>

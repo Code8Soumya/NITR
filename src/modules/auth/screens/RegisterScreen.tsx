@@ -157,19 +157,19 @@ export function RegisterScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-amber-50">
+    <SafeAreaView className="flex-1 bg-background">
       <KeyboardAvoidingView
         className="flex-1"
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
-        <View className="mb-4 mt-6 px-5 border-b border-amber-200/50 pb-4 bg-amber-50 z-10">
-          <Text className="text-3xl font-black text-stone-900">Create account</Text>
-          <Text className="mt-2 text-base text-stone-700">Only NIT Rourkela emails are accepted</Text>
+        <View className="mb-4 mt-6 px-5 border-b border-amber-200/50 pb-4 bg-background z-10">
+          <Text className="text-3xl font-black text-text">Create account</Text>
+          <Text className="mt-2 text-base text-text/80">Only NIT Rourkela emails are accepted</Text>
         </View>
 
         <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingVertical: 10, paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
           <Animated.View
-            className="gap-4 rounded-3xl border border-amber-200 bg-white p-5"
+            className="gap-4 rounded-3xl border border-amber-200 bg-background p-5"
             style={{
               opacity: cardEntrance,
               transform: [
@@ -183,18 +183,18 @@ export function RegisterScreen() {
             }}
           >
             <View>
-              <Text className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-600">Full name <Text className="text-red-500">*</Text></Text>
+              <Text className="mb-2 text-xs font-semibold uppercase tracking-wide text-text/80">Full name <Text className="text-primary text-primary" role="alert" aria-live="polite">*</Text></Text>
               <TextInput
                 onChangeText={setName}
                 placeholder="your real name"
                 placeholderTextColor="#78716c"
                 value={name}
-                className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-base text-stone-900"
+                className="rounded-2xl border border-amber-200 bg-background px-4 py-3 text-base text-text"
               />
             </View>
 
             <View>
-              <Text className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-600">Username <Text className="text-red-500">*</Text></Text>
+              <Text className="mb-2 text-xs font-semibold uppercase tracking-wide text-text/80">Username <Text className="text-primary text-primary" role="alert" aria-live="polite">*</Text></Text>
               <TextInput
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -202,21 +202,21 @@ export function RegisterScreen() {
                 placeholder="username for app"
                 placeholderTextColor="#78716c"
                 value={nickname}
-                className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-base text-stone-900"
+                className="rounded-2xl border border-amber-200 bg-background px-4 py-3 text-base text-text"
               />
             </View>
 
             <View>
-              <Text className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-600">Birth date <Text className="text-red-500">*</Text></Text>
+              <Text className="mb-2 text-xs font-semibold uppercase tracking-wide text-text/80">Birth date <Text className="text-primary text-primary" role="alert" aria-live="polite">*</Text></Text>
               <AnimatedPressable
                 onPress={openBirthDatePicker}
-                className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3"
+                className="rounded-2xl border border-amber-200 bg-background px-4 py-3 cursor-pointer"
               >
-                <Text className="text-base text-stone-900">{birthDate}</Text>
+                <Text className="text-base text-text">{birthDate}</Text>
               </AnimatedPressable>
 
               {Platform.OS === "ios" && showIosDatePicker ? (
-                <View className="mt-3 rounded-2xl border border-amber-200 bg-white p-2">
+                <View className="mt-3 rounded-2xl border border-amber-200 bg-background p-2">
                   <DateTimePicker
                     mode="date"
                     display="spinner"
@@ -230,7 +230,7 @@ export function RegisterScreen() {
             </View>
 
             <View>
-              <Text className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-600">Gender <Text className="text-red-500">*</Text></Text>
+              <Text className="mb-2 text-xs font-semibold uppercase tracking-wide text-text/80">Gender <Text className="text-primary text-primary" role="alert" aria-live="polite">*</Text></Text>
               <View className="flex-row gap-2">
                 {genderOptions.map((option) => {
                   const active = gender === option;
@@ -238,9 +238,9 @@ export function RegisterScreen() {
                     <AnimatedPressable
                       key={option}
                       onPress={() => setGender(option)}
-                      className={`rounded-xl px-3 py-2 ${active ? "bg-rose-600" : "bg-amber-100"}`}
+                      className={`rounded-xl px-3 py-2 ${active ? "btn-primary bg-cta" : "bg-background"}`}
                     >
-                      <Text className={`font-semibold ${active ? "text-white" : "text-stone-700"}`}>
+                      <Text className={`font-semibold ${active ? "text-white" : "text-text/80"}`}>
                         {option}
                       </Text>
                     </AnimatedPressable>
@@ -250,18 +250,18 @@ export function RegisterScreen() {
             </View>
 
             <View>
-              <Text className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-600">Branch <Text className="text-red-500">*</Text></Text>
+              <Text className="mb-2 text-xs font-semibold uppercase tracking-wide text-text/80">Branch <Text className="text-primary text-primary" role="alert" aria-live="polite">*</Text></Text>
               <TextInput
                 onChangeText={setBranch}
                 placeholder="CSE"
                 placeholderTextColor="#78716c"
                 value={branch}
-                className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-base text-stone-900"
+                className="rounded-2xl border border-amber-200 bg-background px-4 py-3 text-base text-text"
               />
             </View>
 
             <View>
-              <Text className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-600">Bio (optional)</Text>
+              <Text className="mb-2 text-xs font-semibold uppercase tracking-wide text-text/80">Bio (optional)</Text>
               <TextInput
                 multiline
                 numberOfLines={4}
@@ -270,12 +270,12 @@ export function RegisterScreen() {
                 placeholderTextColor="#78716c"
                 textAlignVertical="top"
                 value={bio}
-                className="min-h-[96px] rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-base text-stone-900"
+                className="min-h-[96px] rounded-2xl border border-amber-200 bg-background px-4 py-3 text-base text-text"
               />
             </View>
 
             <View>
-              <Text className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-600">
+              <Text className="mb-2 text-xs font-semibold uppercase tracking-wide text-text/80">
                 Interests (optional)
               </Text>
               <TextInput
@@ -283,12 +283,12 @@ export function RegisterScreen() {
                 placeholder="music, coding, football"
                 placeholderTextColor="#78716c"
                 value={interestsText}
-                className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-base text-stone-900"
+                className="rounded-2xl border border-amber-200 bg-background px-4 py-3 text-base text-text"
               />
             </View>
 
             <View>
-              <Text className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-600">Email <Text className="text-red-500">*</Text></Text>
+              <Text className="mb-2 text-xs font-semibold uppercase tracking-wide text-text/80">Email <Text className="text-primary text-primary" role="alert" aria-live="polite">*</Text></Text>
               <TextInput
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -297,12 +297,12 @@ export function RegisterScreen() {
                 placeholder="yourid@nitrkl.ac.in"
                 placeholderTextColor="#78716c"
                 value={email}
-                className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-base text-stone-900"
+                className="rounded-2xl border border-amber-200 bg-background px-4 py-3 text-base text-text"
               />
             </View>
 
             <View>
-              <Text className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-600">Password <Text className="text-red-500">*</Text></Text>
+              <Text className="mb-2 text-xs font-semibold uppercase tracking-wide text-text/80">Password <Text className="text-primary text-primary" role="alert" aria-live="polite">*</Text></Text>
               <View className="relative justify-center">
                 <TextInput
                   secureTextEntry={!showPassword}
@@ -310,34 +310,34 @@ export function RegisterScreen() {
                   placeholder="Min 8 chars, include upper/lower + num"
                   placeholderTextColor="#78716c"
                   value={password}
-                  className="rounded-2xl border border-amber-200 bg-amber-50 pl-4 pr-12 py-3 text-base text-stone-900"
+                  className="rounded-2xl border border-amber-200 bg-background pl-4 pr-12 py-3 text-base text-text"
                 />
                 <AnimatedPressable
                   onPress={() => setShowPassword(!showPassword)}
                   className="absolute right-4 p-1"
                 >
-                  <Text className="text-xs font-bold text-stone-500">{showPassword ? "HIDE" : "SHOW"}</Text>
+                  <Text className="text-xs font-bold font-heading text-text/80">{showPassword ? "HIDE" : "SHOW"}</Text>
                 </AnimatedPressable>
               </View>
             </View>
 
-            {validationError ? <Text className="text-sm text-red-700">{validationError}</Text> : null}
-            {error ? <Text className="text-sm text-red-700">{error}</Text> : null}
+            {validationError ? <Text className="text-sm text-primary">{validationError}</Text> : null}
+            {error ? <Text className="text-sm text-primary">{error}</Text> : null}
 
             <AnimatedPressable
               disabled={busy}
               onPress={onSubmit}
-              className="rounded-2xl bg-rose-600 px-4 py-3"
+              className="rounded-2xl btn-primary bg-cta px-4 py-3 cursor-pointer"
             >
-              <Text className="text-center text-base font-bold text-white">
+              <Text className="text-center text-base font-bold font-heading text-white">
                 {busy ? "Creating account..." : "Create account"}
               </Text>
             </AnimatedPressable>
           </Animated.View>
         </ScrollView>
         <View className="mb-6 mt-4 flex-row justify-center gap-2">
-          <Text className="text-stone-700">Already have an account?</Text>
-          <Link href={"/(auth)/login" as never} className="font-semibold text-rose-700">
+          <Text className="text-text/80">Already have an account?</Text>
+          <Link href={"/(auth)/login" as never} className="font-semibold text-primary">
             Sign in
           </Link>
         </View>

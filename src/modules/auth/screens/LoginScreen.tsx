@@ -49,17 +49,17 @@ export function LoginScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-amber-50 px-5 py-6">
+    <SafeAreaView className="flex-1 bg-background px-5 py-6">
       <View className="mb-8 mt-8">
-        <Text className="text-3xl font-black text-stone-900">Welcome back</Text>
-        <Text className="mt-2 text-base text-stone-700">
+        <Text className="text-3xl font-black text-text">Welcome back</Text>
+        <Text className="mt-2 text-base text-text/80">
           Login with your NIT Rourkela email to continue.
         </Text>
       </View>
 
-      <View className="gap-4 rounded-3xl border border-amber-200 bg-white p-5">
+      <View className="gap-4 rounded-3xl border border-amber-200 bg-background p-5">
         <View>
-          <Text className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-600">Email</Text>
+          <Text className="mb-2 text-xs font-semibold uppercase tracking-wide text-text/80">Email</Text>
           <TextInput
             autoCapitalize="none"
             autoCorrect={false}
@@ -68,38 +68,38 @@ export function LoginScreen() {
             placeholder="yourid@nitrkl.ac.in"
             placeholderTextColor="#78716c"
             value={email}
-            className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-base text-stone-900"
+            className="rounded-2xl border border-amber-200 bg-background px-4 py-3 text-base text-text"
           />
         </View>
 
         <View>
-          <Text className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-600">Password</Text>
+          <Text className="mb-2 text-xs font-semibold uppercase tracking-wide text-text/80">Password</Text>
           <TextInput
             secureTextEntry
             onChangeText={setPassword}
             placeholder="••••••••"
             placeholderTextColor="#78716c"
             value={password}
-            className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-base text-stone-900"
+            className="rounded-2xl border border-amber-200 bg-background px-4 py-3 text-base text-text"
           />
         </View>
 
-        {error ? <Text className="text-sm text-red-700">{error}</Text> : null}
+        {error ? <Text className="text-sm text-primary">{error}</Text> : null}
 
         <AnimatedPressable
           disabled={busy}
           onPress={onSubmit}
-          className="rounded-2xl bg-rose-600 px-4 py-3"
+          className="rounded-2xl btn-primary bg-cta px-4 py-3 cursor-pointer"
         >
-          <Text className="text-center text-base font-bold text-white">
+          <Text className="text-center text-base font-bold font-heading text-white">
             {busy ? "Signing in..." : "Sign in"}
           </Text>
         </AnimatedPressable>
       </View>
 
       <View className="mt-5 flex-row justify-center gap-2">
-        <Text className="text-stone-700">New here?</Text>
-        <Link href={"/(auth)/register" as never} className="font-semibold text-rose-700">
+        <Text className="text-text/80">New here?</Text>
+        <Link href={"/(auth)/register" as never} className="font-semibold text-primary">
           Create account
         </Link>
       </View>

@@ -37,7 +37,7 @@ export function PostDetailScreen() {
   if (!post) {
     return (
       <SafeAreaView className="flex-1 items-center justify-center bg-[#fffaf2] px-6">
-        <Text className="text-lg font-semibold text-slate-900">Post unavailable</Text>
+        <Text className="text-lg font-body text-text font-semibold text-slate-900">Post unavailable</Text>
         <Text className="mt-2 text-center text-sm text-slate-500">
           It may have been deleted or not loaded yet.
         </Text>
@@ -55,8 +55,8 @@ export function PostDetailScreen() {
           videoAudioMode={videoAudioMode}
         />
 
-        <View className="rounded-2xl bg-white p-4" style={{ elevation: 2 }}>
-          <Text className="text-lg font-bold text-slate-900">Comments</Text>
+        <View className="rounded-2xl bg-background p-4" style={{ elevation: 2 }}>
+          <Text className="text-lg font-body text-text font-bold font-heading text-slate-900">Comments</Text>
           <Text className="mt-1 text-sm text-slate-500">
             Keep it respectful. Campus code of conduct applies.
           </Text>
@@ -80,7 +80,7 @@ export function PostDetailScreen() {
           />
 
           <Pressable
-            className="mt-3 rounded-xl bg-rose-600 px-4 py-3"
+            className="mt-3 rounded-xl btn-primary bg-cta px-4 py-3 cursor-pointer"
             android_ripple={{ color: "#be123c" }}
             onPress={() => {
               const trimmed = comment.trim();
